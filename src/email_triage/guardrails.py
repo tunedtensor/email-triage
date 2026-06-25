@@ -49,7 +49,13 @@ BILLING_ESCALATION_PATTERNS = [
 ]
 
 OPERATIONAL_SAFE_PATTERNS = [
+    r"\baccelerator deadline scan\b",
+    r"\bcompetitor radar\b",
+    r"\bdaily compounding read\b",
+    r"\bdaily content next step\b",
     r"\binternal scan report\b",
+    r"\bmarket intelligence\b",
+    r"\bweekly [a-z0-9 _-]+ (report|scan)\b",
     r"\bdry scan finished\b",
     r"\baudit log written\b",
     r"\bdelivery status notification\b",
@@ -58,8 +64,9 @@ OPERATIONAL_SAFE_PATTERNS = [
 ]
 
 
-def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str, Any]:
-    text = " ".join(part for part in [email.subject, email.body] if part).lower()
+def guardrail_decision(email: "EmailInput", decision: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    decision = decision or {}
+    text = " ".join(part for part in [email.sender, email.subject, email.body] if part).lower()
     if _matches_any(text, PROMPT_ATTACK_PATTERNS):
         return {
             **decision,
@@ -80,6 +87,8 @@ def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str,
             "confidence": max(float(decision.get("confidence", 0)), 0.88),
             "reason": "Email asks for credentials or account verification.",
         }
+    if "agentmail" in text and _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
+        return _operational_safe_decision(decision)
     if _matches_any(text, MALWARE_PATTERNS):
         return {
             **decision,
@@ -111,16 +120,24 @@ def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str,
             "reason": "Legitimate billing or invoice issue requiring review.",
         }
     if _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
-        return {
-            **decision,
-            "triage": "review",
-            "priority": "normal",
-            "risk": "none",
-            "should_process": True,
-            "confidence": max(float(decision.get("confidence", 0)), 0.74),
-            "reason": "Operational status message with no concrete malicious signal.",
-        }
-    return decision
+        return _operational_safe_decision(decision)
+    return None
+
+
+def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str, Any]:
+    return guardrail_decision(email, decision) or decision
+
+
+def _operational_safe_decision(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **decision,
+        "triage": "review",
+        "priority": "normal",
+        "risk": "none",
+        "should_process": True,
+        "confidence": max(float(decision.get("confidence", 0)), 0.74),
+        "reason": "Operational status message with no concrete malicious signal.",
+    }
 
 
 def _matches_any(text: str, patterns: list[str]) -> bool:
