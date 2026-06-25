@@ -59,9 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8011)
     serve.add_argument("--ctx-size", type=int, default=4096)
+    serve.add_argument("--gpu-layers", type=int)
     serve.add_argument("--parallel", type=int, default=1)
     serve.add_argument("--threads", type=int)
     serve.add_argument("--temperature", type=float, default=0.0)
+    serve.add_argument(
+        "--enable-reasoning",
+        action="store_true",
+        help="allow model thinking/reasoning output; disabled by default for JSON classification",
+    )
     serve.add_argument(
         "--extra-arg",
         action="append",
@@ -186,9 +192,11 @@ def run_serve(args: argparse.Namespace) -> None:
             host=args.host,
             port=args.port,
             ctx_size=args.ctx_size,
+            gpu_layers=args.gpu_layers,
             parallel=args.parallel,
             threads=args.threads,
             temperature=args.temperature,
+            reasoning=args.enable_reasoning,
             extra_args=args.extra_arg,
         )
     )

@@ -24,9 +24,13 @@ TRIAGE_ALIASES = {
     "quarantined": "ignore",
     "delete": "ignore",
     "discard": "ignore",
+    "spam": "archive",
     "flag": "review",
     "manual_review": "review",
     "human_review": "review",
+    "security_review": "review",
+    "business": "review",
+    "through": "review",
 }
 
 RISK_ALIASES = {
@@ -34,6 +38,7 @@ RISK_ALIASES = {
     "credential_theft": "credential_request",
     "credential": "credential_request",
     "prompt injection": "prompt_attack",
+    "prompt_injection": "prompt_attack",
     "prompt-injection": "prompt_attack",
     "jailbreak": "prompt_attack",
 }
@@ -43,6 +48,14 @@ PRIORITY_BY_NUMBER = {
     2: "normal",
     3: "high",
     4: "critical",
+}
+
+RISK_BY_NUMBER = {
+    0: "none",
+    1: "suspicious",
+    2: "spam",
+    3: "phishing",
+    4: "prompt_attack",
 }
 
 
@@ -89,13 +102,14 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
+    value = _repair_missing_fields(dict(value))
     missing = [key for key in SCHEMA_KEYS if key not in value]
     if missing:
         raise TriageValidationError(f"missing required keys: {', '.join(missing)}")
 
     triage = _enum_value(value["triage"], TRIAGE_VALUES, "triage", aliases=TRIAGE_ALIASES)
     priority = _priority_value(value["priority"])
-    risk = _enum_value(value["risk"], RISK_VALUES, "risk", aliases=RISK_ALIASES)
+    risk = _risk_value(value["risk"])
     should_process = _bool_value(value["should_process"], "should_process")
     confidence = _confidence_value(value["confidence"])
     reason = _reason_value(value["reason"])
@@ -112,6 +126,54 @@ def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
 
 def parse_decision(text: str) -> dict[str, Any]:
     return normalize_decision(extract_json_object(text))
+
+
+def _repair_missing_fields(value: dict[str, Any]) -> dict[str, Any]:
+    if "risk" in value and "triage" not in value:
+        risk = str(value["risk"]).strip().lower()
+        risk = RISK_ALIASES.get(risk, risk)
+        should_process = value.get("should_process")
+        if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
+            value["triage"] = "ignore"
+        elif risk == "spam":
+            value["triage"] = "archive"
+        elif should_process is False or str(should_process).strip().lower() == "false":
+            value["triage"] = "archive"
+        else:
+            value["triage"] = "review"
+
+    if "risk" not in value and "triage" in value:
+        triage = str(value["triage"]).strip().lower()
+        value["risk"] = "spam" if triage == "spam" else "none"
+
+    if "should_process" not in value and "risk" in value:
+        risk = str(value["risk"]).strip().lower()
+        risk = RISK_ALIASES.get(risk, risk)
+        value["should_process"] = risk not in {
+            "spam",
+            "phishing",
+            "prompt_attack",
+            "credential_request",
+            "malware",
+        }
+
+    if "priority" not in value and "risk" in value:
+        risk = str(value["risk"]).strip().lower()
+        risk = RISK_ALIASES.get(risk, risk)
+        value["priority"] = "critical" if risk in {
+            "phishing",
+            "prompt_attack",
+            "credential_request",
+            "malware",
+        } else "normal"
+
+    if "confidence" not in value:
+        value["confidence"] = 0.5
+
+    if "reason" not in value:
+        value["reason"] = "Model omitted a reason."
+
+    return value
 
 
 def _enum_value(
@@ -144,6 +206,20 @@ def _priority_value(value: Any) -> str:
         if number in PRIORITY_BY_NUMBER:
             return PRIORITY_BY_NUMBER[number]
     return _enum_value(value, PRIORITY_VALUES, "priority")
+
+
+def _risk_value(value: Any) -> str:
+    if isinstance(value, bool):
+        raise TriageValidationError("risk must be a string")
+    if isinstance(value, int) and value in RISK_BY_NUMBER:
+        return RISK_BY_NUMBER[value]
+    if isinstance(value, float) and value.is_integer() and int(value) in RISK_BY_NUMBER:
+        return RISK_BY_NUMBER[int(value)]
+    if isinstance(value, str) and value.strip().isdigit():
+        number = int(value.strip())
+        if number in RISK_BY_NUMBER:
+            return RISK_BY_NUMBER[number]
+    return _enum_value(value, RISK_VALUES, "risk", aliases=RISK_ALIASES)
 
 
 def _escalate_priority(priority: str, risk: str, should_process: bool) -> str:

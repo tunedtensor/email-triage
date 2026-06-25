@@ -34,6 +34,29 @@ MALWARE_PATTERNS = [
     r"\brun the attached\b",
 ]
 
+SPAM_PATTERNS = [
+    r"\blast chance offer\b",
+    r"\blimited time offer\b",
+    r"\bclick (this link|now)\b",
+    r"\bclaim (your )?(prize|discount|reward)\b",
+    r"\bunsubscribe never\b",
+]
+
+BILLING_ESCALATION_PATTERNS = [
+    r"\bcharged twice\b",
+    r"\bbilling error\b",
+    r"\binvoice [a-z0-9_-]+.*\breview\b",
+]
+
+OPERATIONAL_SAFE_PATTERNS = [
+    r"\binternal scan report\b",
+    r"\bdry scan finished\b",
+    r"\baudit log written\b",
+    r"\bdelivery status notification\b",
+    r"\bpackage [a-z0-9_-]+ was delivered\b",
+    r"\bno action required\b",
+]
+
 
 def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str, Any]:
     text = " ".join(part for part in [email.subject, email.body] if part).lower()
@@ -66,6 +89,36 @@ def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str,
             "should_process": False,
             "confidence": max(float(decision.get("confidence", 0)), 0.88),
             "reason": "Email asks the user to run risky attachment content or enable macros.",
+        }
+    if decision.get("risk") in {"none", "spam", "suspicious"} and _matches_any(text, SPAM_PATTERNS):
+        return {
+            **decision,
+            "triage": "archive",
+            "priority": "low",
+            "risk": "spam",
+            "should_process": False,
+            "confidence": max(float(decision.get("confidence", 0)), 0.86),
+            "reason": "Unsolicited promotional content with spam indicators.",
+        }
+    if _matches_any(text, BILLING_ESCALATION_PATTERNS):
+        return {
+            **decision,
+            "triage": "escalate",
+            "priority": "high",
+            "risk": "none",
+            "should_process": True,
+            "confidence": max(float(decision.get("confidence", 0)), 0.78),
+            "reason": "Legitimate billing or invoice issue requiring review.",
+        }
+    if _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
+        return {
+            **decision,
+            "triage": "review",
+            "priority": "normal",
+            "risk": "none",
+            "should_process": True,
+            "confidence": max(float(decision.get("confidence", 0)), 0.74),
+            "reason": "Operational status message with no concrete malicious signal.",
         }
     return decision
 

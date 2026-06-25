@@ -33,9 +33,11 @@ def run_llama_server(
     host: str = "127.0.0.1",
     port: int = 8011,
     ctx_size: int = 4096,
+    gpu_layers: int | None = None,
     parallel: int = 1,
     threads: int | None = None,
     temperature: float = 0.0,
+    reasoning: bool = False,
     extra_args: list[str] | None = None,
 ) -> int:
     if not model_path.exists():
@@ -56,9 +58,15 @@ def run_llama_server(
         "--temp",
         str(temperature),
     ]
+    if gpu_layers is not None:
+        command.extend(["-ngl", str(gpu_layers)])
+    if not reasoning:
+        command.extend(["--reasoning", "off"])
     if threads is not None:
         command.extend(["-t", str(threads)])
     if extra_args:
         command.extend(extra_args)
-    return subprocess.run(command, check=False).returncode
-
+    try:
+        return subprocess.run(command, check=False).returncode
+    except KeyboardInterrupt:
+        return 130

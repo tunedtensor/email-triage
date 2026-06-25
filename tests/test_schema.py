@@ -41,6 +41,35 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(parsed["risk"], "prompt_attack")
         self.assertIs(parsed["should_process"], False)
 
+    def test_parse_decision_repairs_missing_triage_from_risk(self):
+        parsed = parse_decision(
+            '{"priority":1,"risk":"prompt_injection","should_process":false,'
+            '"confidence":0.95,"reason":"Prompt injection attempt."}'
+        )
+
+        self.assertEqual(parsed["triage"], "ignore")
+        self.assertEqual(parsed["priority"], "critical")
+        self.assertEqual(parsed["risk"], "prompt_attack")
+        self.assertIs(parsed["should_process"], False)
+
+    def test_parse_decision_repairs_missing_triage_for_spam(self):
+        parsed = parse_decision(
+            '{"priority":"low","risk":"spam","should_process":false,'
+            '"confidence":0.86,"reason":"Spam indicators."}'
+        )
+
+        self.assertEqual(parsed["triage"], "archive")
+
+    def test_parse_decision_canonicalizes_local_gguf_aliases(self):
+        parsed = parse_decision(
+            '{"triage":"through","priority":"normal","risk":0,'
+            '"should_process":true,"confidence":0.92,'
+            '"reason":"Delivery notification."}'
+        )
+
+        self.assertEqual(parsed["triage"], "review")
+        self.assertEqual(parsed["risk"], "none")
+
 
 if __name__ == "__main__":
     unittest.main()

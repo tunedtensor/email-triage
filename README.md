@@ -58,10 +58,17 @@ OUT_DIR=models \
 scripts/convert-hf-to-gguf.sh
 ```
 
+For Qwen3.5 artifacts that advertise MTP/next-token-prediction layers but do not
+ship those tensors, the conversion script defaults to `DISABLE_MTP=auto` and writes
+a loadable text-only GGUF. Set `DISABLE_MTP=0` to preserve the source config exactly.
+
 Serve:
 
 ```bash
-email-triage serve models/email-triage-Q5_K_M.gguf --port 8011
+email-triage serve models/email-triage-Q5_K_M.gguf \
+  --port 8011 \
+  --ctx-size 4096 \
+  --gpu-layers 99
 ```
 
 Classify:
@@ -76,6 +83,9 @@ email-triage triage \
 ```
 
 The CLI sends the embedded email-triage system prompt by default for OpenAI-compatible servers. If the server already applies that prompt, pass `--no-system-prompt`.
+`email-triage serve` disables llama.cpp reasoning output by default so Qwen-style
+thinking content does not consume the JSON response budget. Pass `--enable-reasoning`
+only for debugging raw model behavior.
 
 ## CLI
 
