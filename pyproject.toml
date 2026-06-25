@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "email-triage"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Whisper-style local CLI and Python API for strict JSON email triage."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,3 +17,6 @@ dependencies = [
 
 [project.scripts]
 email-triage = "email_triage.cli:main"
+
+[tool.hatch.version]
+path = "src/email_triage/__init__.py"

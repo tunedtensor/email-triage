@@ -13,6 +13,16 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(args.command, "models")
 
+    def test_parser_prints_version(self):
+        parser = build_parser()
+        output = io.StringIO()
+
+        with redirect_stdout(output), self.assertRaises(SystemExit) as raised:
+            parser.parse_args(["--version"])
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("email-triage 0.1.0", output.getvalue())
+
     def test_parser_has_serve_command(self):
         parser = build_parser()
         args = parser.parse_args(["serve", "--port", "8012"])

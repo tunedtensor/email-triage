@@ -8,6 +8,7 @@ from email.parser import BytesParser
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .backends import BackendError, create_backend
 from .guardrails import apply_guardrails
 from .harness import EmailInput, EmailTriageHarness
@@ -37,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="email-triage",
         description="Classify email-like content into strict JSON triage decisions.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     triage = subparsers.add_parser("triage", help="classify one email")

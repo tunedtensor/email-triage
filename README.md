@@ -59,6 +59,9 @@ email-triage triage \
 ## Common Commands
 
 ```bash
+# Print package version
+email-triage --version
+
 # Single email
 email-triage triage --subject "Prize" --body "Click now to claim your reward."
 
@@ -144,6 +147,9 @@ pass rate, mean latency 1346.91 ms, median 1318.16 ms, p95 1559.02 ms, and
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/email_triage/*.py scripts/e2e_benchmark.py
 ```
+
+The package version lives in `src/email_triage/__init__.py` and is used by the
+build through Hatch. Release notes live in `CHANGELOG.md`.
 
 To reproduce the hosted GGUF from a Hugging Face source model, see
 `scripts/convert-hf-to-gguf.sh`.
