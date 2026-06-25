@@ -137,14 +137,18 @@ def create_backend(
     model: str | None,
     api_base: str | None,
     api_key_env: str | None,
-    device: str,
     include_system_prompt: bool = True,
 ) -> TriageBackend:
     model_id = resolve_model_id(model)
-    if backend == "auto":
-        backend = "openai" if api_base else "gguf"
     if backend == "rules":
         return RulesBackend()
+    if backend == "auto" and api_base:
+        backend = "openai"
+    if backend == "auto":
+        raise BackendError(
+            "local GGUF inference runs through llama.cpp. Start `email-triage serve` "
+            "in another terminal, then pass --api-base http://127.0.0.1:8011/v1."
+        )
     if backend == "openai":
         if not api_base:
             raise BackendError("--api-base is required for --backend openai")
@@ -154,11 +158,6 @@ def create_backend(
             model=model_id,
             api_key=api_key,
             include_system_prompt=include_system_prompt,
-        )
-    if backend == "gguf":
-        raise BackendError(
-            "local GGUF inference runs through llama.cpp. Start `email-triage serve` "
-            "in another terminal, then pass --api-base http://127.0.0.1:8011/v1."
         )
     raise BackendError(f"unknown backend: {backend}")
 

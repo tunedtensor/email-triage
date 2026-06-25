@@ -12,7 +12,6 @@ class HarnessTest(unittest.TestCase):
                 model="small",
                 api_base=None,
                 api_key_env=None,
-                device="auto",
             )
 
     def test_rules_backend_prompt_attack(self):

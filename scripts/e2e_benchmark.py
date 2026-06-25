@@ -154,7 +154,6 @@ def main() -> int:
         model=args.model,
         api_base=args.api_base,
         api_key_env=None,
-        device="auto",
         include_system_prompt=args.include_system_prompt,
     )
     harness = EmailTriageHarness(backend)

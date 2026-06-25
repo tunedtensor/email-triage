@@ -17,7 +17,6 @@ def triage(
     model: str | None = "small",
     api_base: str | None = None,
     api_key_env: str | None = None,
-    device: str = "auto",
     include_system_prompt: bool = True,
     max_new_tokens: int = 192,
     temperature: float = 0.0,
@@ -28,7 +27,6 @@ def triage(
         model=model,
         api_base=api_base,
         api_key_env=api_key_env,
-        device=device,
         include_system_prompt=include_system_prompt,
     )
     harness = EmailTriageHarness(
@@ -53,7 +51,6 @@ def triage_batch(
     model: str | None = "small",
     api_base: str | None = None,
     api_key_env: str | None = None,
-    device: str = "auto",
     include_system_prompt: bool = True,
     max_new_tokens: int = 192,
     temperature: float = 0.0,
@@ -64,7 +61,6 @@ def triage_batch(
         model=model,
         api_base=api_base,
         api_key_env=api_key_env,
-        device=device,
         include_system_prompt=include_system_prompt,
     )
     harness = EmailTriageHarness(
@@ -73,4 +69,3 @@ def triage_batch(
         temperature=temperature,
     )
     return [harness.triage(email) for email in emails]
-

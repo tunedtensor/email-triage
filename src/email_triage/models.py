@@ -23,10 +23,6 @@ class ModelPreset:
     description: str
     revision: str = "main"
 
-    @property
-    def url(self) -> str:
-        return f"https://huggingface.co/{self.repo_id}/resolve/{self.revision}/{self.filename}"
-
 
 MODEL_PRESETS: dict[str, ModelPreset] = {
     "small": ModelPreset(
@@ -110,20 +106,14 @@ def download_gguf_model(
     try:
         from huggingface_hub import hf_hub_download
 
-        path = hf_hub_download(
-            repo_id=preset.repo_id,
-            filename=preset.filename,
-            revision=preset.revision,
-            local_dir=str(destination.parent),
-            force_download=force_download,
+        return Path(
+            hf_hub_download(
+                repo_id=preset.repo_id,
+                filename=preset.filename,
+                revision=preset.revision,
+                local_dir=str(destination.parent),
+                force_download=force_download,
+            )
         )
     except Exception as exc:
         raise ModelDownloadError(f"failed to download {preset.repo_id}/{preset.filename}: {exc}") from exc
-    path = Path(path)
-    if path.resolve() == destination.resolve():
-        return destination
-    if path != destination and path.exists():
-        if destination.exists():
-            destination.unlink()
-        path.replace(destination)
-    return destination

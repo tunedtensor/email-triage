@@ -11,7 +11,12 @@ from typing import Any
 from .backends import BackendError, create_backend
 from .guardrails import apply_guardrails
 from .harness import EmailInput, EmailTriageHarness
-from .models import MODEL_PRESETS, ModelDownloadError, local_model_path, resolve_gguf_model_path, resolve_model_id
+from .models import (
+    MODEL_PRESETS,
+    ModelDownloadError,
+    local_model_path,
+    resolve_gguf_model_path,
+)
 from .prompt import build_prompt
 from .schema import TriageValidationError, parse_decision
 from .serve import ServeError, run_llama_server
@@ -104,7 +109,6 @@ def add_backend_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--model", default="small", help="model preset or model id")
     parser.add_argument("--api-base", help="OpenAI-compatible API base URL, e.g. http://127.0.0.1:8000/v1")
     parser.add_argument("--api-key-env", help="environment variable containing API key")
-    parser.add_argument("--device", default="auto", help="transformers device: auto, cpu, cuda, mps")
     parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument(
@@ -231,10 +235,9 @@ def run_serve(args: argparse.Namespace) -> None:
 def create_backend_from_args(args: argparse.Namespace):
     return create_backend(
         backend=args.backend,
-        model=resolve_model_id(args.model),
+        model=args.model,
         api_base=args.api_base,
         api_key_env=args.api_key_env,
-        device=args.device,
         include_system_prompt=not args.no_system_prompt,
     )
 
