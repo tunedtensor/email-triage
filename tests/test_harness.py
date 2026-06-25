@@ -55,6 +55,50 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(decision["risk"], "prompt_attack")
         self.assertIs(decision["should_process"], False)
 
+    def test_guardrail_overrides_credential_miss(self):
+        class BenignBackend:
+            def generate(self, prompt, *, max_new_tokens, temperature):
+                return (
+                    '{"triage":"reply","priority":"normal","risk":"none",'
+                    '"should_process":true,"confidence":0.6,'
+                    '"reason":"Legitimate message."}'
+                )
+
+        harness = EmailTriageHarness(BenignBackend())
+        decision = harness.triage(
+            EmailInput(
+                subject="Action required: password reset",
+                body="Please verify your account password at the attached login page.",
+            )
+        )
+
+        self.assertEqual(decision["triage"], "ignore")
+        self.assertEqual(decision["priority"], "critical")
+        self.assertEqual(decision["risk"], "credential_request")
+        self.assertIs(decision["should_process"], False)
+
+    def test_guardrail_overrides_malware_miss(self):
+        class BenignBackend:
+            def generate(self, prompt, *, max_new_tokens, temperature):
+                return (
+                    '{"triage":"review","priority":"normal","risk":"none",'
+                    '"should_process":true,"confidence":0.6,'
+                    '"reason":"Legitimate message."}'
+                )
+
+        harness = EmailTriageHarness(BenignBackend())
+        decision = harness.triage(
+            EmailInput(
+                subject="Invoice attached",
+                body="Open the attached executable invoice viewer and enable macros.",
+            )
+        )
+
+        self.assertEqual(decision["triage"], "ignore")
+        self.assertEqual(decision["priority"], "critical")
+        self.assertEqual(decision["risk"], "malware")
+        self.assertIs(decision["should_process"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

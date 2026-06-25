@@ -149,6 +149,21 @@ The harness validates every model response, canonicalizes common drift such as `
 - `transformers`: direct Hugging Face model loading; useful for debugging, less ideal for local serving.
 - `auto`: uses `openai` when `--api-base` is provided, otherwise `transformers`.
 
+## Benchmark
+
+Run the E2E benchmark against a local OpenAI-compatible server:
+
+```bash
+PYTHONPATH=src python3 scripts/e2e_benchmark.py \
+  --api-base http://127.0.0.1:8011/v1 \
+  --model Qwen3.5-2B-ft-be85015a \
+  --warmup 2 \
+  --repeat 3 \
+  --json-output /tmp/email-triage-e2e-report.json
+```
+
+The benchmark uses a small golden set covering legitimate operational messages, billing/support, spam/phishing, prompt attacks, credential requests, malware-like attachment instructions, and suspicious vendor-change content. It reports schema pass rate, expected-field accuracy, latency percentiles, and sequential throughput.
+
 ## Project Shape
 
 This repository is intentionally independent from the training project. Training, evaluation, and model hosting can happen elsewhere. This package owns the user-facing harness:
@@ -159,4 +174,3 @@ This repository is intentionally independent from the training project. Training
 - guardrails
 - CLI and Python API
 - local runtime integration
-
