@@ -15,10 +15,18 @@ class CliTest(unittest.TestCase):
 
     def test_parser_has_serve_command(self):
         parser = build_parser()
-        args = parser.parse_args(["serve", "model.gguf", "--port", "8012"])
+        args = parser.parse_args(["serve", "--port", "8012"])
 
         self.assertEqual(args.command, "serve")
+        self.assertEqual(args.model_path, "small")
         self.assertEqual(args.port, 8012)
+
+    def test_parser_has_download_command(self):
+        parser = build_parser()
+        args = parser.parse_args(["download", "--model", "small"])
+
+        self.assertEqual(args.command, "download")
+        self.assertEqual(args.model, "small")
 
     def test_email_input_from_json_accepts_content_alias(self):
         email_input = email_input_from_json({"subject": "Hello", "content": "Need support"})
@@ -35,7 +43,9 @@ class CliTest(unittest.TestCase):
         rows = json.loads(output.getvalue())
 
         self.assertEqual(rows[0]["preset"], "small")
-        self.assertEqual(rows[0]["model"], "weijianzhg/email-safety-triage-qwen3.5-2b")
+        self.assertEqual(rows[0]["repo"], "tunedtensor/email-triage-gguf")
+        self.assertEqual(rows[0]["filename"], "email-triage-Q5_K_M.gguf")
+        self.assertEqual(rows[0]["api_model"], "email-triage")
 
 
 if __name__ == "__main__":

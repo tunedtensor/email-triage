@@ -1,10 +1,20 @@
 import unittest
 
-from email_triage.backends import RulesBackend
+from email_triage.backends import BackendError, RulesBackend, create_backend
 from email_triage.harness import EmailInput, EmailTriageHarness
 
 
 class HarnessTest(unittest.TestCase):
+    def test_auto_backend_without_api_base_requires_gguf_server(self):
+        with self.assertRaisesRegex(BackendError, "email-triage serve"):
+            create_backend(
+                backend="auto",
+                model="small",
+                api_base=None,
+                api_key_env=None,
+                device="auto",
+            )
+
     def test_rules_backend_prompt_attack(self):
         harness = EmailTriageHarness(RulesBackend())
 

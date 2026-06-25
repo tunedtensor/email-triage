@@ -142,7 +142,7 @@ def percentile(values: list[float], pct: float) -> float:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Email Triage end-to-end benchmark.")
     parser.add_argument("--api-base", default="http://127.0.0.1:8011/v1")
-    parser.add_argument("--model", default="Qwen3.5-2B-ft-be85015a")
+    parser.add_argument("--model", default="email-triage")
     parser.add_argument("--include-system-prompt", action="store_true")
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--repeat", type=int, default=2)
@@ -256,4 +256,3 @@ def _matches_expected(decision: dict[str, Any], expected: dict[str, Any]) -> boo
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

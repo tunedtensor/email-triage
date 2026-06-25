@@ -11,7 +11,7 @@ from typing import Any
 from .backends import BackendError, create_backend
 from .guardrails import apply_guardrails
 from .harness import EmailInput, EmailTriageHarness
-from .models import MODEL_PRESETS, resolve_model_id
+from .models import MODEL_PRESETS, ModelDownloadError, local_model_path, resolve_gguf_model_path, resolve_model_id
 from .prompt import build_prompt
 from .schema import TriageValidationError, parse_decision
 from .serve import ServeError, run_llama_server
@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     try:
         args.func(args)
-    except (BackendError, ServeError, TriageValidationError, OSError, ValueError) as exc:
+    except (BackendError, ModelDownloadError, ServeError, TriageValidationError, OSError, ValueError) as exc:
         print(f"email-triage: error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
@@ -53,13 +53,21 @@ def build_parser() -> argparse.ArgumentParser:
     models = subparsers.add_parser("models", help="list model presets")
     models.set_defaults(func=run_models)
 
-    serve = subparsers.add_parser("serve", help="serve a local GGUF model with llama.cpp")
-    serve.add_argument("model_path", type=Path, help="path to a GGUF model")
+    download = subparsers.add_parser("download", help="download the default GGUF model from Hugging Face")
+    download.add_argument("--model", default="small", help="GGUF preset name")
+    download.add_argument("--cache-dir", type=Path, help="model cache directory")
+    download.add_argument("--force", action="store_true", help="download even if the model is already cached")
+    download.set_defaults(func=run_download)
+
+    serve = subparsers.add_parser("serve", help="serve a local or cached GGUF model with llama.cpp")
+    serve.add_argument("model_path", nargs="?", default="small", help="path to a GGUF model or preset name")
     serve.add_argument("--llama-server", help="path to llama.cpp llama-server binary")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8011)
     serve.add_argument("--ctx-size", type=int, default=4096)
     serve.add_argument("--gpu-layers", type=int)
+    serve.add_argument("--cache-dir", type=Path, help="model cache directory")
+    serve.add_argument("--force-download", action="store_true", help="download the GGUF again before serving")
     serve.add_argument("--parallel", type=int, default=1)
     serve.add_argument("--threads", type=int)
     serve.add_argument("--temperature", type=float, default=0.0)
@@ -89,7 +97,7 @@ def add_input_args(parser: argparse.ArgumentParser) -> None:
 def add_backend_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--backend",
-        choices=["auto", "transformers", "openai", "rules"],
+        choices=["auto", "openai", "rules"],
         default="auto",
         help="inference backend",
     )
@@ -176,7 +184,11 @@ def run_models(args: argparse.Namespace) -> None:
     rows = [
         {
             "preset": preset.name,
-            "model": preset.model_id,
+            "repo": preset.repo_id,
+            "filename": preset.filename,
+            "quantization": preset.quantization,
+            "api_model": preset.api_model_id,
+            "local_path": str(local_model_path(preset)),
             "description": preset.description,
         }
         for preset in MODEL_PRESETS.values()
@@ -184,10 +196,24 @@ def run_models(args: argparse.Namespace) -> None:
     print(json.dumps(rows, indent=2))
 
 
+def run_download(args: argparse.Namespace) -> None:
+    path = resolve_gguf_model_path(
+        args.model,
+        cache_dir=args.cache_dir,
+        force_download=args.force,
+    )
+    print(str(path))
+
+
 def run_serve(args: argparse.Namespace) -> None:
+    model_path = resolve_gguf_model_path(
+        args.model_path,
+        cache_dir=args.cache_dir,
+        force_download=args.force_download,
+    )
     raise SystemExit(
         run_llama_server(
-            model_path=args.model_path,
+            model_path=model_path,
             llama_server=args.llama_server,
             host=args.host,
             port=args.port,

@@ -11,13 +11,8 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Email Triage contributors" }]
 keywords = ["email", "triage", "security", "classification", "llama.cpp", "huggingface"]
-dependencies = []
-
-[project.optional-dependencies]
-local = [
-  "torch>=2.2",
-  "transformers>=4.45",
-  "accelerate>=0.34",
+dependencies = [
+  "huggingface-hub>=0.30",
 ]
 
 [project.scripts]

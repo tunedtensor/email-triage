@@ -70,55 +70,6 @@ class OpenAICompatibleBackend(TriageBackend):
         return headers
 
 
-class TransformersBackend(TriageBackend):
-    def __init__(self, *, model: str, device: str = "auto") -> None:
-        try:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-        except ImportError as exc:
-            raise BackendError(
-                "transformers backend requires: pip install -e '.[local]'"
-            ) from exc
-
-        self.torch = torch
-        self.tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
-        kwargs: dict[str, Any] = {"trust_remote_code": True}
-        if device == "auto":
-            kwargs["device_map"] = "auto"
-        else:
-            kwargs["device_map"] = {"": device}
-        if torch.cuda.is_available():
-            kwargs["torch_dtype"] = torch.bfloat16
-        self.model = AutoModelForCausalLM.from_pretrained(model, **kwargs)
-
-    def generate(self, prompt: str, *, max_new_tokens: int, temperature: float) -> str:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ]
-        if hasattr(self.tokenizer, "apply_chat_template"):
-            text = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-            )
-        else:
-            text = f"{SYSTEM_PROMPT}\n\n{prompt}\n"
-
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-        do_sample = temperature > 0
-        with self.torch.no_grad():
-            generated = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=do_sample,
-                temperature=temperature if do_sample else None,
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
-        new_tokens = generated[0][inputs["input_ids"].shape[-1] :]
-        return self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-
-
 class RulesBackend(TriageBackend):
     """Deterministic fallback for smoke tests and integration development."""
 
@@ -191,7 +142,7 @@ def create_backend(
 ) -> TriageBackend:
     model_id = resolve_model_id(model)
     if backend == "auto":
-        backend = "openai" if api_base else "transformers"
+        backend = "openai" if api_base else "gguf"
     if backend == "rules":
         return RulesBackend()
     if backend == "openai":
@@ -204,8 +155,11 @@ def create_backend(
             api_key=api_key,
             include_system_prompt=include_system_prompt,
         )
-    if backend == "transformers":
-        return TransformersBackend(model=model_id, device=device)
+    if backend == "gguf":
+        raise BackendError(
+            "local GGUF inference runs through llama.cpp. Start `email-triage serve` "
+            "in another terminal, then pass --api-base http://127.0.0.1:8011/v1."
+        )
     raise BackendError(f"unknown backend: {backend}")
 
 
@@ -215,4 +169,3 @@ def _matches(text: str, needles: list[str]) -> bool:
 
 def _decision(**values: Any) -> str:
     return json.dumps(values, separators=(",", ":"), sort_keys=True)
-
