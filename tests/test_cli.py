@@ -1,0 +1,42 @@
+import json
+import io
+import unittest
+from contextlib import redirect_stdout
+
+from email_triage.cli import build_parser, email_input_from_json
+
+
+class CliTest(unittest.TestCase):
+    def test_parser_has_required_commands(self):
+        parser = build_parser()
+        args = parser.parse_args(["models"])
+
+        self.assertEqual(args.command, "models")
+
+    def test_parser_has_serve_command(self):
+        parser = build_parser()
+        args = parser.parse_args(["serve", "model.gguf", "--port", "8012"])
+
+        self.assertEqual(args.command, "serve")
+        self.assertEqual(args.port, 8012)
+
+    def test_email_input_from_json_accepts_content_alias(self):
+        email_input = email_input_from_json({"subject": "Hello", "content": "Need support"})
+
+        self.assertEqual(email_input.subject, "Hello")
+        self.assertEqual(email_input.body, "Need support")
+
+    def test_models_command_shape(self):
+        parser = build_parser()
+        args = parser.parse_args(["models"])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            args.func(args)
+        rows = json.loads(output.getvalue())
+
+        self.assertEqual(rows[0]["preset"], "small")
+        self.assertEqual(rows[0]["model"], "weijianzhg/email-safety-triage-qwen3.5-2b")
+
+
+if __name__ == "__main__":
+    unittest.main()

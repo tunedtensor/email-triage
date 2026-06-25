@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Any
+
+from .backends import create_backend
+from .harness import EmailInput, EmailTriageHarness
+
+
+def triage(
+    body: str,
+    *,
+    subject: str | None = None,
+    sender: str | None = None,
+    content_type: str = "email",
+    backend: str = "auto",
+    model: str | None = "small",
+    api_base: str | None = None,
+    api_key_env: str | None = None,
+    device: str = "auto",
+    include_system_prompt: bool = True,
+    max_new_tokens: int = 192,
+    temperature: float = 0.0,
+) -> dict[str, Any]:
+    """Classify one email-like input and return a validated decision."""
+    triage_backend = create_backend(
+        backend=backend,
+        model=model,
+        api_base=api_base,
+        api_key_env=api_key_env,
+        device=device,
+        include_system_prompt=include_system_prompt,
+    )
+    harness = EmailTriageHarness(
+        triage_backend,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+    )
+    return harness.triage(
+        EmailInput(
+            body=body,
+            subject=subject,
+            sender=sender,
+            content_type=content_type,
+        )
+    )
+
+
+def triage_batch(
+    emails: Iterable[EmailInput],
+    *,
+    backend: str = "auto",
+    model: str | None = "small",
+    api_base: str | None = None,
+    api_key_env: str | None = None,
+    device: str = "auto",
+    include_system_prompt: bool = True,
+    max_new_tokens: int = 192,
+    temperature: float = 0.0,
+) -> list[dict[str, Any]]:
+    """Classify a sequence of email-like inputs with one backend instance."""
+    triage_backend = create_backend(
+        backend=backend,
+        model=model,
+        api_base=api_base,
+        api_key_env=api_key_env,
+        device=device,
+        include_system_prompt=include_system_prompt,
+    )
+    harness = EmailTriageHarness(
+        triage_backend,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+    )
+    return [harness.triage(email) for email in emails]
+

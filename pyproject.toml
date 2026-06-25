@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "email-triage"
+version = "0.1.0"
+description = "Whisper-style local CLI and Python API for strict JSON email triage."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Email Triage contributors" }]
+keywords = ["email", "triage", "security", "classification", "llama.cpp", "huggingface"]
+dependencies = []
+
+[project.optional-dependencies]
+local = [
+  "torch>=2.2",
+  "transformers>=4.45",
+  "accelerate>=0.34",
+]
+
+[project.scripts]
+email-triage = "email_triage.cli:main"
