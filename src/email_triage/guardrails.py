@@ -50,6 +50,9 @@ BILLING_ESCALATION_PATTERNS = [
 
 OPERATIONAL_SAFE_PATTERNS = [
     r"\binternal scan report\b",
+    r"\b(automated|internal|scheduled) (status|summary|digest|report|scan)\b",
+    r"\b(system|service|delivery) status (notification|report|summary)\b",
+    r"\b(dry run|dry scan|scan) (finished|completed)\b",
     r"\bdry scan finished\b",
     r"\baudit log written\b",
     r"\bdelivery status notification\b",
@@ -58,8 +61,9 @@ OPERATIONAL_SAFE_PATTERNS = [
 ]
 
 
-def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str, Any]:
-    text = " ".join(part for part in [email.subject, email.body] if part).lower()
+def guardrail_decision(email: "EmailInput", decision: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    decision = decision or {}
+    text = " ".join(part for part in [email.sender, email.subject, email.body] if part).lower()
     if _matches_any(text, PROMPT_ATTACK_PATTERNS):
         return {
             **decision,
@@ -110,17 +114,35 @@ def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str,
             "confidence": max(float(decision.get("confidence", 0)), 0.78),
             "reason": "Legitimate billing or invoice issue requiring review.",
         }
-    if _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
-        return {
-            **decision,
-            "triage": "review",
-            "priority": "normal",
-            "risk": "none",
-            "should_process": True,
-            "confidence": max(float(decision.get("confidence", 0)), 0.74),
-            "reason": "Operational status message with no concrete malicious signal.",
-        }
-    return decision
+    if _can_mark_operational_safe(decision) and _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
+        return _operational_safe_decision(decision)
+    return None
+
+
+def apply_guardrails(email: "EmailInput", decision: dict[str, Any]) -> dict[str, Any]:
+    return guardrail_decision(email, decision) or decision
+
+
+def _operational_safe_decision(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **decision,
+        "triage": "review",
+        "priority": "normal",
+        "risk": "none",
+        "should_process": True,
+        "confidence": max(float(decision.get("confidence", 0)), 0.74),
+        "reason": "Operational status message with no concrete malicious signal.",
+    }
+
+
+def _can_mark_operational_safe(decision: dict[str, Any]) -> bool:
+    risk = decision.get("risk")
+    if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
+        return False
+    triage = decision.get("triage")
+    if triage == "ignore":
+        return False
+    return risk in {None, "none", "spam", "suspicious"} or triage in {None, "archive", "review"}
 
 
 def _matches_any(text: str, patterns: list[str]) -> bool:

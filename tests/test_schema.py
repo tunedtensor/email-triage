@@ -70,6 +70,52 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(parsed["triage"], "review")
         self.assertEqual(parsed["risk"], "none")
 
+    def test_parse_decision_canonicalizes_prompt_abuse_model_drift(self):
+        parsed = parse_decision(
+            '{"triage":"process","priority":"medium","risk":"prompt_abuse",'
+            '"should_process":"no","confidence":0.91,'
+            '"reason":"Tool abuse request."}'
+        )
+
+        self.assertEqual(parsed["triage"], "ignore")
+        self.assertEqual(parsed["priority"], "critical")
+        self.assertEqual(parsed["risk"], "prompt_attack")
+        self.assertIs(parsed["should_process"], False)
+
+    def test_parse_decision_defaults_unknown_safe_triage_to_review(self):
+        parsed = parse_decision(
+            '{"triage":"operational","priority":"standard","risk":"clean",'
+            '"should_process":"yes","confidence":0.82,'
+            '"reason":"Normal digest."}'
+        )
+
+        self.assertEqual(parsed["triage"], "review")
+        self.assertEqual(parsed["priority"], "normal")
+        self.assertEqual(parsed["risk"], "none")
+        self.assertIs(parsed["should_process"], True)
+
+    def test_parse_decision_repairs_common_json_string_boundary_typo(self):
+        parsed = parse_decision(
+            '{"confidence":0.91,"priority":1,"risk":"none,""should_process":true,'
+            '"triage":"promote","reason":"Promotional tutorial."}'
+        )
+
+        self.assertEqual(parsed["triage"], "archive")
+        self.assertEqual(parsed["priority"], "low")
+        self.assertEqual(parsed["risk"], "none")
+        self.assertIs(parsed["should_process"], True)
+
+    def test_parse_decision_accepts_false_risk_and_zero_priority(self):
+        parsed = parse_decision(
+            '{"confidence":0.95,"priority":0,"reason":"No prompt attack.",'
+            '"risk":"false","should_process":true,"triage":"review"}'
+        )
+
+        self.assertEqual(parsed["triage"], "review")
+        self.assertEqual(parsed["priority"], "low")
+        self.assertEqual(parsed["risk"], "none")
+        self.assertIs(parsed["should_process"], True)
+
 
 if __name__ == "__main__":
     unittest.main()

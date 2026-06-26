@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -18,32 +19,86 @@ RISK_VALUES = {
 SCHEMA_KEYS = ("triage", "priority", "risk", "should_process", "confidence", "reason")
 
 TRIAGE_ALIASES = {
+    "action": "review",
+    "action_required": "review",
+    "allow": "review",
+    "allowed": "review",
     "block": "ignore",
     "blocked": "ignore",
+    "business": "review",
+    "clean": "review",
     "quarantine": "ignore",
     "quarantined": "ignore",
     "delete": "ignore",
     "discard": "ignore",
+    "forward": "review",
+    "forwarded": "review",
     "spam": "archive",
     "flag": "review",
+    "important": "review",
+    "inbox": "review",
+    "legitimate": "review",
+    "marketing": "archive",
     "manual_review": "review",
     "human_review": "review",
+    "newsletter": "archive",
+    "normal": "review",
+    "ok": "review",
+    "pass": "review",
+    "passed": "review",
+    "process": "review",
+    "processed": "review",
+    "promote": "archive",
+    "promotional": "archive",
+    "respond": "reply",
+    "response": "reply",
+    "safe": "review",
     "security_review": "review",
-    "business": "review",
     "through": "review",
 }
 
 RISK_ALIASES = {
+    "benign": "none",
+    "clean": "none",
     "credential theft": "credential_request",
     "credential_theft": "credential_request",
     "credential": "credential_request",
+    "credential phishing": "credential_request",
+    "credential_phishing": "credential_request",
+    "credentials": "credential_request",
+    "none detected": "none",
+    "no risk": "none",
+    "no_risk": "none",
+    "not suspicious": "none",
+    "not_suspicious": "none",
+    "ok": "none",
+    "false": "none",
     "prompt injection": "prompt_attack",
     "prompt_injection": "prompt_attack",
     "prompt-injection": "prompt_attack",
+    "prompt abuse": "prompt_attack",
+    "prompt_abuse": "prompt_attack",
+    "prompt-abuse": "prompt_attack",
+    "prompt attack": "prompt_attack",
+    "prompt-attack": "prompt_attack",
+    "safe": "none",
+    "scam": "phishing",
+    "tool abuse": "prompt_attack",
+    "tool_abuse": "prompt_attack",
+    "tool-abuse": "prompt_attack",
     "jailbreak": "prompt_attack",
+    "virus": "malware",
+}
+
+PRIORITY_ALIASES = {
+    "medium": "normal",
+    "moderate": "normal",
+    "standard": "normal",
+    "urgent": "critical",
 }
 
 PRIORITY_BY_NUMBER = {
+    0: "low",
     1: "low",
     2: "normal",
     3: "high",
@@ -93,12 +148,19 @@ def extract_json_object(text: str) -> dict[str, Any]:
                 try:
                     value = json.loads(raw)
                 except json.JSONDecodeError as exc:
-                    raise TriageValidationError(f"invalid JSON object: {exc}") from exc
+                    try:
+                        value = json.loads(_repair_common_json_drift(raw))
+                    except json.JSONDecodeError:
+                        raise TriageValidationError(f"invalid JSON object: {exc}") from exc
                 if not isinstance(value, dict):
                     raise TriageValidationError("model output JSON was not an object")
                 return value
 
     raise TriageValidationError("model output contained an unclosed JSON object")
+
+
+def _repair_common_json_drift(raw: str) -> str:
+    return re.sub(r'"(risk|triage|priority)"\s*:\s*"([^"]+),""([a-z_]+)"\s*:', r'"\1":"\2","\3":', raw)
 
 
 def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -107,10 +169,10 @@ def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
     if missing:
         raise TriageValidationError(f"missing required keys: {', '.join(missing)}")
 
-    triage = _enum_value(value["triage"], TRIAGE_VALUES, "triage", aliases=TRIAGE_ALIASES)
-    priority = _priority_value(value["priority"])
     risk = _risk_value(value["risk"])
     should_process = _bool_value(value["should_process"], "should_process")
+    triage = _triage_value(value["triage"], risk, should_process)
+    priority = _priority_value(value["priority"])
     confidence = _confidence_value(value["confidence"])
     reason = _reason_value(value["reason"])
 
@@ -194,6 +256,17 @@ def _enum_value(
     return normalized
 
 
+def _triage_value(value: Any, risk: str, should_process: bool) -> str:
+    if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
+        return "ignore"
+    if risk == "spam" or not should_process:
+        return "archive"
+    try:
+        return _enum_value(value, TRIAGE_VALUES, "triage", aliases=TRIAGE_ALIASES)
+    except TriageValidationError:
+        return "review"
+
+
 def _priority_value(value: Any) -> str:
     if isinstance(value, bool):
         raise TriageValidationError("priority must be a string")
@@ -205,7 +278,7 @@ def _priority_value(value: Any) -> str:
         number = int(value.strip())
         if number in PRIORITY_BY_NUMBER:
             return PRIORITY_BY_NUMBER[number]
-    return _enum_value(value, PRIORITY_VALUES, "priority")
+    return _enum_value(value, PRIORITY_VALUES, "priority", aliases=PRIORITY_ALIASES)
 
 
 def _risk_value(value: Any) -> str:
@@ -231,11 +304,13 @@ def _escalate_priority(priority: str, risk: str, should_process: bool) -> str:
 def _bool_value(value: Any, field: str) -> bool:
     if isinstance(value, bool):
         return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
-        if normalized == "true":
+        if normalized in {"true", "yes", "y", "1", "process", "should_process"}:
             return True
-        if normalized == "false":
+        if normalized in {"false", "no", "n", "0", "do_not_process", "do not process"}:
             return False
     raise TriageValidationError(f"{field} must be a boolean")
 
