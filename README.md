@@ -13,6 +13,53 @@ It uses one supported model path by default:
 - Preset name: `small`
 - Runtime: `llama.cpp` via its OpenAI-compatible server
 
+## Current Design
+
+```mermaid
+flowchart TD
+    A["Email input<br/>subject, sender, body, .eml, JSON, JSONL"] --> B["Normalize / parse input"]
+
+    B --> C["Layer 1: Prompt-injection gate<br/>weijianzhg/prompt-injection-classifier"]
+    C --> D{"Risk above threshold<br/>or deterministic pattern match?"}
+
+    D -- "Yes" --> E["Short-circuit decision"]
+    E --> F["JSON output<br/>triage: ignore<br/>priority: critical<br/>risk: prompt_attack<br/>should_process: false"]
+
+    D -- "No" --> G["Layer 2: Email triage model"]
+    G --> H["OpenAI-compatible backend"]
+    H --> I["llama.cpp server"]
+    I --> J["GGUF model<br/>tunedtensor/email-triage-gguf<br/>email-triage-Q5_K_M.gguf"]
+
+    J --> K["Raw model JSON"]
+    K --> L["Schema validation + repair"]
+    L --> M["Post-triage guardrails<br/>credential theft, malware, spam,<br/>fallback prompt-injection safety"]
+    M --> N["Final JSON output<br/>triage, priority, risk,<br/>should_process, confidence, reason"]
+
+    subgraph CLI["CLI / Python API"]
+        A
+        B
+    end
+
+    subgraph Gate["Fast first stage"]
+        C
+        D
+        E
+    end
+
+    subgraph Triage["LLM triage stage"]
+        G
+        H
+        I
+        J
+    end
+
+    subgraph Safety["Validation and guardrails"]
+        K
+        L
+        M
+    end
+```
+
 ## Install
 
 ```bash
