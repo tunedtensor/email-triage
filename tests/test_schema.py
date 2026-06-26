@@ -70,7 +70,7 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(parsed["triage"], "review")
         self.assertEqual(parsed["risk"], "none")
 
-    def test_parse_decision_canonicalizes_real_inbox_model_drift(self):
+    def test_parse_decision_canonicalizes_prompt_abuse_model_drift(self):
         parsed = parse_decision(
             '{"triage":"process","priority":"medium","risk":"prompt_abuse",'
             '"should_process":"no","confidence":0.91,'
@@ -94,7 +94,7 @@ class SchemaTest(unittest.TestCase):
         self.assertEqual(parsed["risk"], "none")
         self.assertIs(parsed["should_process"], True)
 
-    def test_parse_decision_repairs_real_inbox_json_typo(self):
+    def test_parse_decision_repairs_common_json_string_boundary_typo(self):
         parsed = parse_decision(
             '{"confidence":0.91,"priority":1,"risk":"none,""should_process":true,'
             '"triage":"promote","reason":"Promotional tutorial."}'

@@ -148,7 +148,7 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(decision["risk"], "none")
         self.assertIs(decision["should_process"], True)
 
-    def test_guardrail_overrides_generated_report_false_phishing(self):
+    def test_security_decision_beats_generic_operational_report(self):
         class DriftBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
@@ -160,31 +160,27 @@ class HarnessTest(unittest.TestCase):
         harness = EmailTriageHarness(DriftBackend())
         decision = harness.triage(
             EmailInput(
-                subject="Daily compounding read — 2026-06-11",
-                body="Automated product and writing digest. No action required.",
+                subject="Automated status digest",
+                body="Scheduled system status report. No action required.",
             )
         )
 
-        self.assertEqual(decision["triage"], "review")
-        self.assertEqual(decision["priority"], "normal")
-        self.assertEqual(decision["risk"], "none")
-        self.assertIs(decision["should_process"], True)
+        self.assertEqual(decision["triage"], "ignore")
+        self.assertEqual(decision["priority"], "critical")
+        self.assertEqual(decision["risk"], "phishing")
+        self.assertIs(decision["should_process"], False)
 
-    def test_agentmail_generated_report_can_override_false_malware_guardrail(self):
-        class BenignBackend:
+    def test_guardrail_fallback_handles_malformed_operational_report_output(self):
+        class MalformedBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
-                return (
-                    '{"triage":"review","priority":"low","risk":"none",'
-                    '"should_process":true,"confidence":0.91,'
-                    '"reason":"Generated report."}'
-                )
+                return '{"triage":"process","priority":"normal","risk":"none"'
 
-        harness = EmailTriageHarness(BenignBackend())
+        harness = EmailTriageHarness(MalformedBackend())
         decision = harness.triage(
             EmailInput(
-                sender="AgentMail <eve-assistant@agentmail.to>",
-                subject="Daily content next step — 2026-06-05",
-                body="The report says to run the attached experiment later.",
+                sender="reports@example.com",
+                subject="Automated status digest",
+                body="Scheduled system status report. No action required.",
             )
         )
 
@@ -193,7 +189,7 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(decision["risk"], "none")
         self.assertIs(decision["should_process"], True)
 
-    def test_external_malware_signal_still_blocks_with_report_like_subject(self):
+    def test_malware_signal_still_blocks_with_report_like_subject(self):
         class BenignBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
@@ -206,7 +202,7 @@ class HarnessTest(unittest.TestCase):
         decision = harness.triage(
             EmailInput(
                 sender="attacker@example.com",
-                subject="Daily content next step — 2026-06-05",
+                subject="Automated status digest",
                 body="Open the attached executable invoice viewer and enable macros.",
             )
         )

@@ -49,13 +49,10 @@ BILLING_ESCALATION_PATTERNS = [
 ]
 
 OPERATIONAL_SAFE_PATTERNS = [
-    r"\baccelerator deadline scan\b",
-    r"\bcompetitor radar\b",
-    r"\bdaily compounding read\b",
-    r"\bdaily content next step\b",
     r"\binternal scan report\b",
-    r"\bmarket intelligence\b",
-    r"\bweekly [a-z0-9 _-]+ (report|scan)\b",
+    r"\b(automated|internal|scheduled) (status|summary|digest|report|scan)\b",
+    r"\b(system|service|delivery) status (notification|report|summary)\b",
+    r"\b(dry run|dry scan|scan) (finished|completed)\b",
     r"\bdry scan finished\b",
     r"\baudit log written\b",
     r"\bdelivery status notification\b",
@@ -87,8 +84,6 @@ def guardrail_decision(email: "EmailInput", decision: dict[str, Any] | None = No
             "confidence": max(float(decision.get("confidence", 0)), 0.88),
             "reason": "Email asks for credentials or account verification.",
         }
-    if "agentmail" in text and _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
-        return _operational_safe_decision(decision)
     if _matches_any(text, MALWARE_PATTERNS):
         return {
             **decision,
@@ -119,7 +114,7 @@ def guardrail_decision(email: "EmailInput", decision: dict[str, Any] | None = No
             "confidence": max(float(decision.get("confidence", 0)), 0.78),
             "reason": "Legitimate billing or invoice issue requiring review.",
         }
-    if _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
+    if _can_mark_operational_safe(decision) and _matches_any(text, OPERATIONAL_SAFE_PATTERNS):
         return _operational_safe_decision(decision)
     return None
 
@@ -138,6 +133,16 @@ def _operational_safe_decision(decision: dict[str, Any]) -> dict[str, Any]:
         "confidence": max(float(decision.get("confidence", 0)), 0.74),
         "reason": "Operational status message with no concrete malicious signal.",
     }
+
+
+def _can_mark_operational_safe(decision: dict[str, Any]) -> bool:
+    risk = decision.get("risk")
+    if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
+        return False
+    triage = decision.get("triage")
+    if triage == "ignore":
+        return False
+    return risk in {None, "none", "spam", "suspicious"} or triage in {None, "archive", "review"}
 
 
 def _matches_any(text: str, patterns: list[str]) -> bool:
