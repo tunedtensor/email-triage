@@ -21,7 +21,7 @@ class CliTest(unittest.TestCase):
             parser.parse_args(["--version"])
 
         self.assertEqual(raised.exception.code, 0)
-        self.assertIn("email-triage 0.1.0", output.getvalue())
+        self.assertIn("email-triage 0.2.0", output.getvalue())
 
     def test_parser_has_serve_command(self):
         parser = build_parser()
@@ -37,6 +37,27 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(args.command, "download")
         self.assertEqual(args.model, "small")
+
+    def test_parser_has_prompt_injection_gate_args(self):
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "triage",
+                "--backend",
+                "rules",
+                "--prompt-injection-gate",
+                "heuristic",
+                "--prompt-injection-threshold",
+                "0.9",
+                "--subject",
+                "Hello",
+                "--body",
+                "Need support",
+            ]
+        )
+
+        self.assertEqual(args.prompt_injection_gate, "heuristic")
+        self.assertEqual(args.prompt_injection_threshold, 0.9)
 
     def test_email_input_from_json_accepts_content_alias(self):
         email_input = email_input_from_json({"subject": "Hello", "content": "Need support"})

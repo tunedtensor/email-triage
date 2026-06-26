@@ -113,6 +113,7 @@ def download_gguf_model(
                 revision=preset.revision,
                 local_dir=str(destination.parent),
                 force_download=force_download,
+                token=os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN") or False,
             )
         )
     except Exception as exc:

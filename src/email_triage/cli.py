@@ -10,7 +10,6 @@ from typing import Any
 
 from . import __version__
 from .backends import BackendError, create_backend
-from .guardrails import apply_guardrails
 from .harness import EmailInput, EmailTriageHarness
 from .models import (
     MODEL_PRESETS,
@@ -18,8 +17,12 @@ from .models import (
     local_model_path,
     resolve_gguf_model_path,
 )
+from .prompt_injection import DEFAULT_PROMPT_INJECTION_REPO
+from .prompt_injection import DEFAULT_PROMPT_INJECTION_THRESHOLD
+from .prompt_injection import PromptInjectionGateError
+from .prompt_injection import create_prompt_injection_gate
 from .prompt import build_prompt
-from .schema import TriageValidationError, parse_decision
+from .schema import TriageValidationError
 from .serve import ServeError, run_llama_server
 
 
@@ -28,7 +31,15 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     try:
         args.func(args)
-    except (BackendError, ModelDownloadError, ServeError, TriageValidationError, OSError, ValueError) as exc:
+    except (
+        BackendError,
+        ModelDownloadError,
+        PromptInjectionGateError,
+        ServeError,
+        TriageValidationError,
+        OSError,
+        ValueError,
+    ) as exc:
         print(f"email-triage: error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
@@ -114,6 +125,23 @@ def add_backend_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument(
+        "--prompt-injection-gate",
+        choices=["classifier", "heuristic", "off"],
+        default="classifier",
+        help="first-stage prompt-injection gate before LLM triage",
+    )
+    parser.add_argument(
+        "--prompt-injection-model",
+        default=DEFAULT_PROMPT_INJECTION_REPO,
+        help="Hugging Face repo for the first-stage prompt-injection classifier",
+    )
+    parser.add_argument(
+        "--prompt-injection-threshold",
+        type=float,
+        default=DEFAULT_PROMPT_INJECTION_THRESHOLD,
+        help="minimum classifier malicious probability required to block before LLM triage",
+    )
+    parser.add_argument(
         "--no-system-prompt",
         action="store_true",
         help="omit system message for OpenAI-compatible backend",
@@ -127,20 +155,14 @@ def run_triage(args: argparse.Namespace) -> None:
         backend,
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
+        prompt_injection_gate=create_prompt_injection_gate(
+            args.prompt_injection_gate,
+            model_repo=args.prompt_injection_model,
+            threshold=args.prompt_injection_threshold,
+        ),
     )
     if args.raw:
-        raw = harness.generate_raw(email_input)
-        try:
-            decision = apply_guardrails(email_input, parse_decision(raw))
-        except TriageValidationError as exc:
-            print(
-                json.dumps(
-                    {"raw": raw, "validation_error": str(exc)},
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                )
-            )
-            raise
+        decision, raw = harness.triage_with_raw(email_input)
         print(json.dumps({"raw": raw, "decision": decision}, separators=(",", ":"), ensure_ascii=False))
     else:
         decision = harness.triage(email_input)
@@ -153,6 +175,11 @@ def run_batch(args: argparse.Namespace) -> None:
         backend,
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
+        prompt_injection_gate=create_prompt_injection_gate(
+            args.prompt_injection_gate,
+            model_repo=args.prompt_injection_model,
+            threshold=args.prompt_injection_threshold,
+        ),
     )
     output_handle = args.output.open("w", encoding="utf-8") if args.output else sys.stdout
     close_output = args.output is not None

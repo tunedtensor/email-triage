@@ -6,6 +6,8 @@ from typing import Any
 from .backends import TriageBackend
 from .guardrails import apply_guardrails
 from .guardrails import guardrail_decision
+from .prompt_injection import PromptInjectionGate
+from .prompt_injection import prompt_injection_decision
 from .prompt import build_prompt
 from .schema import TriageValidationError
 from .schema import parse_decision
@@ -26,16 +28,24 @@ class EmailTriageHarness:
         *,
         max_new_tokens: int = 192,
         temperature: float = 0.0,
+        prompt_injection_gate: PromptInjectionGate | None = None,
     ) -> None:
         self.backend = backend
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
+        self.prompt_injection_gate = prompt_injection_gate
 
     def triage(self, email: EmailInput) -> dict[str, Any]:
+        gated = self._prompt_injection_decision(email)
+        if gated is not None:
+            return gated
         raw = self.generate_raw(email)
         return self._parse_or_guardrail(email, raw)
 
     def triage_with_raw(self, email: EmailInput) -> tuple[dict[str, Any], str]:
+        gated = self._prompt_injection_decision(email)
+        if gated is not None:
+            return gated, ""
         raw = self.generate_raw(email)
         return self._parse_or_guardrail(email, raw), raw
 
@@ -62,3 +72,11 @@ class EmailTriageHarness:
                 return override
             raise
         return apply_guardrails(email, decision)
+
+    def _prompt_injection_decision(self, email: EmailInput) -> dict[str, Any] | None:
+        if self.prompt_injection_gate is None:
+            return None
+        result = self.prompt_injection_gate.check(email)
+        if result.is_risky:
+            return prompt_injection_decision(result)
+        return None

@@ -6,6 +6,13 @@ All notable changes to Email Triage are recorded here.
 
 - No unreleased changes yet.
 
+## 0.2.0 - 2026-06-26
+
+- Added a first-stage prompt-injection gate using `weijianzhg/prompt-injection-classifier`.
+- Short-circuit prompt-injection risk before calling the LLM triage backend.
+- Added `--prompt-injection-gate`, `--prompt-injection-model`, and `--prompt-injection-threshold` CLI options.
+- Kept deterministic prompt-injection guardrails as a fallback safety layer.
+
 ## 0.1.0 - 2026-06-25
 
 - Added the Email Triage CLI and Python API.
