@@ -21,7 +21,7 @@ class CliTest(unittest.TestCase):
             parser.parse_args(["--version"])
 
         self.assertEqual(raised.exception.code, 0)
-        self.assertIn("email-triage 0.2.0", output.getvalue())
+        self.assertIn("email-triage 0.3.0", output.getvalue())
 
     def test_parser_has_serve_command(self):
         parser = build_parser()
@@ -74,9 +74,9 @@ class CliTest(unittest.TestCase):
         rows = json.loads(output.getvalue())
 
         self.assertEqual(rows[0]["preset"], "small")
-        self.assertEqual(rows[0]["repo"], "tunedtensor/email-triage-gguf")
-        self.assertEqual(rows[0]["filename"], "email-triage-Q5_K_M.gguf")
-        self.assertEqual(rows[0]["api_model"], "email-triage")
+        self.assertEqual(rows[0]["repo"], "tunedtensor/email-triage-v1-gguf")
+        self.assertEqual(rows[0]["filename"], "email-triage-v1-Q5_K_M.gguf")
+        self.assertEqual(rows[0]["api_model"], "email-triage-v1")
 
 
 if __name__ == "__main__":

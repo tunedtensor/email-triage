@@ -221,9 +221,9 @@ def prompt_injection_decision(result: PromptInjectionResult) -> dict[str, object
     return {
         "triage": "ignore",
         "priority": "critical",
-        "risk": "prompt_attack",
         "should_process": False,
         "confidence": max(result.confidence, 0.9),
+        "summary": "Email was blocked before LLM triage because it matched prompt-injection signals.",
         "reason": "Prompt-injection gate blocked the email before LLM triage.",
     }
 

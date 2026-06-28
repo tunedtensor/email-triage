@@ -7,9 +7,9 @@ Triage CLI with the prompt-injection gate and hosted GGUF triage model.
 
 - Default preset: `small`
 - Prompt-injection classifier: `weijianzhg/prompt-injection-classifier`
-- Hugging Face repo: `tunedtensor/email-triage-gguf`
-- GGUF file: `email-triage-Q5_K_M.gguf`
-- OpenAI-compatible model id: `email-triage`
+- Hugging Face repo: `tunedtensor/email-triage-v1-gguf`
+- GGUF file: `email-triage-v1-Q5_K_M.gguf`
+- OpenAI-compatible model id: `email-triage-v1`
 - Cache control: `EMAIL_TRIAGE_CACHE_DIR=/path/to/cache` or `--cache-dir /path/to/cache`
 
 Do not commit `.gguf` files, cache directories, or secret tokens.
@@ -51,9 +51,9 @@ Expected output is a single JSON object with:
 
 - `triage`: `reply`, `archive`, `escalate`, `ignore`, or `review`
 - `priority`: `low`, `normal`, `high`, or `critical`
-- `risk`: `none`, `spam`, `phishing`, `prompt_attack`, `credential_request`, `malware`, or `suspicious`
 - `should_process`: boolean
 - `confidence`: number from `0` to `1`
+- `summary`: short string
 - `reason`: short string
 
 ## Smoke Test

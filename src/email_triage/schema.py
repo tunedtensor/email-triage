@@ -7,16 +7,20 @@ from typing import Any
 
 TRIAGE_VALUES = {"reply", "archive", "escalate", "ignore", "review"}
 PRIORITY_VALUES = {"low", "normal", "high", "critical"}
-RISK_VALUES = {
-    "none",
-    "spam",
-    "phishing",
-    "prompt_attack",
-    "credential_request",
-    "malware",
-    "suspicious",
+SCHEMA_KEYS = ("triage", "priority", "should_process", "confidence", "summary", "reason")
+DECISION_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": list(SCHEMA_KEYS),
+    "properties": {
+        "triage": {"type": "string", "enum": sorted(TRIAGE_VALUES)},
+        "priority": {"type": "string", "enum": sorted(PRIORITY_VALUES)},
+        "should_process": {"type": "boolean"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 320},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 240},
+    },
 }
-SCHEMA_KEYS = ("triage", "priority", "risk", "should_process", "confidence", "reason")
 
 TRIAGE_ALIASES = {
     "action": "review",
@@ -27,67 +31,28 @@ TRIAGE_ALIASES = {
     "blocked": "ignore",
     "business": "review",
     "clean": "review",
-    "quarantine": "ignore",
-    "quarantined": "ignore",
     "delete": "ignore",
     "discard": "ignore",
+    "flag": "review",
     "forward": "review",
     "forwarded": "review",
-    "spam": "archive",
-    "flag": "review",
-    "important": "review",
+    "human_review": "review",
     "inbox": "review",
     "legitimate": "review",
-    "marketing": "archive",
     "manual_review": "review",
-    "human_review": "review",
+    "marketing": "archive",
     "newsletter": "archive",
-    "normal": "review",
     "ok": "review",
     "pass": "review",
-    "passed": "review",
     "process": "review",
-    "processed": "review",
-    "promote": "archive",
     "promotional": "archive",
+    "quarantine": "ignore",
+    "quarantined": "ignore",
     "respond": "reply",
     "response": "reply",
     "safe": "review",
-    "security_review": "review",
+    "spam": "archive",
     "through": "review",
-}
-
-RISK_ALIASES = {
-    "benign": "none",
-    "clean": "none",
-    "credential theft": "credential_request",
-    "credential_theft": "credential_request",
-    "credential": "credential_request",
-    "credential phishing": "credential_request",
-    "credential_phishing": "credential_request",
-    "credentials": "credential_request",
-    "none detected": "none",
-    "no risk": "none",
-    "no_risk": "none",
-    "not suspicious": "none",
-    "not_suspicious": "none",
-    "ok": "none",
-    "false": "none",
-    "prompt injection": "prompt_attack",
-    "prompt_injection": "prompt_attack",
-    "prompt-injection": "prompt_attack",
-    "prompt abuse": "prompt_attack",
-    "prompt_abuse": "prompt_attack",
-    "prompt-abuse": "prompt_attack",
-    "prompt attack": "prompt_attack",
-    "prompt-attack": "prompt_attack",
-    "safe": "none",
-    "scam": "phishing",
-    "tool abuse": "prompt_attack",
-    "tool_abuse": "prompt_attack",
-    "tool-abuse": "prompt_attack",
-    "jailbreak": "prompt_attack",
-    "virus": "malware",
 }
 
 PRIORITY_ALIASES = {
@@ -103,14 +68,6 @@ PRIORITY_BY_NUMBER = {
     2: "normal",
     3: "high",
     4: "critical",
-}
-
-RISK_BY_NUMBER = {
-    0: "none",
-    1: "suspicious",
-    2: "spam",
-    3: "phishing",
-    4: "prompt_attack",
 }
 
 
@@ -160,7 +117,11 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def _repair_common_json_drift(raw: str) -> str:
-    return re.sub(r'"(risk|triage|priority)"\s*:\s*"([^"]+),""([a-z_]+)"\s*:', r'"\1":"\2","\3":', raw)
+    return re.sub(
+        r'"(summary|reason|triage|priority)"\s*:\s*"([^"]+),""([a-z_]+)"\s*:',
+        r'"\1":"\2","\3":',
+        raw,
+    )
 
 
 def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -169,19 +130,19 @@ def normalize_decision(value: Mapping[str, Any]) -> dict[str, Any]:
     if missing:
         raise TriageValidationError(f"missing required keys: {', '.join(missing)}")
 
-    risk = _risk_value(value["risk"])
-    should_process = _bool_value(value["should_process"], "should_process")
-    triage = _triage_value(value["triage"], risk, should_process)
+    triage = _triage_value(value["triage"])
     priority = _priority_value(value["priority"])
+    should_process = _bool_value(value["should_process"], "should_process")
     confidence = _confidence_value(value["confidence"])
-    reason = _reason_value(value["reason"])
+    summary = _text_value(value["summary"], "summary", max_length=320)
+    reason = _text_value(value["reason"], "reason", max_length=240)
 
     return {
         "triage": triage,
-        "priority": _escalate_priority(priority, risk, should_process),
-        "risk": risk,
-        "should_process": should_process,
+        "priority": priority,
+        "should_process": _align_should_process(triage, should_process),
         "confidence": confidence,
+        "summary": summary,
         "reason": reason,
     }
 
@@ -191,46 +152,29 @@ def parse_decision(text: str) -> dict[str, Any]:
 
 
 def _repair_missing_fields(value: dict[str, Any]) -> dict[str, Any]:
-    if "risk" in value and "triage" not in value:
+    if "triage" not in value and "risk" in value:
         risk = str(value["risk"]).strip().lower()
-        risk = RISK_ALIASES.get(risk, risk)
-        should_process = value.get("should_process")
-        if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
+        if risk in {"phishing", "prompt_attack", "prompt-injection", "prompt_injection", "credential_request", "malware"}:
             value["triage"] = "ignore"
         elif risk == "spam":
-            value["triage"] = "archive"
-        elif should_process is False or str(should_process).strip().lower() == "false":
+            value["triage"] = "ignore"
+        elif value.get("should_process") is False:
             value["triage"] = "archive"
         else:
             value["triage"] = "review"
 
-    if "risk" not in value and "triage" in value:
+    if "should_process" not in value and "triage" in value:
         triage = str(value["triage"]).strip().lower()
-        value["risk"] = "spam" if triage == "spam" else "none"
+        value["should_process"] = triage not in {"archive", "ignore", "spam", "delete", "discard"}
 
-    if "should_process" not in value and "risk" in value:
-        risk = str(value["risk"]).strip().lower()
-        risk = RISK_ALIASES.get(risk, risk)
-        value["should_process"] = risk not in {
-            "spam",
-            "phishing",
-            "prompt_attack",
-            "credential_request",
-            "malware",
-        }
-
-    if "priority" not in value and "risk" in value:
-        risk = str(value["risk"]).strip().lower()
-        risk = RISK_ALIASES.get(risk, risk)
-        value["priority"] = "critical" if risk in {
-            "phishing",
-            "prompt_attack",
-            "credential_request",
-            "malware",
-        } else "normal"
+    if "priority" not in value:
+        value["priority"] = "normal"
 
     if "confidence" not in value:
         value["confidence"] = 0.5
+
+    if "summary" not in value:
+        value["summary"] = value.get("reason", "No summary provided.")
 
     if "reason" not in value:
         value["reason"] = "Model omitted a reason."
@@ -256,11 +200,7 @@ def _enum_value(
     return normalized
 
 
-def _triage_value(value: Any, risk: str, should_process: bool) -> str:
-    if risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
-        return "ignore"
-    if risk == "spam" or not should_process:
-        return "archive"
+def _triage_value(value: Any) -> str:
     try:
         return _enum_value(value, TRIAGE_VALUES, "triage", aliases=TRIAGE_ALIASES)
     except TriageValidationError:
@@ -279,26 +219,6 @@ def _priority_value(value: Any) -> str:
         if number in PRIORITY_BY_NUMBER:
             return PRIORITY_BY_NUMBER[number]
     return _enum_value(value, PRIORITY_VALUES, "priority", aliases=PRIORITY_ALIASES)
-
-
-def _risk_value(value: Any) -> str:
-    if isinstance(value, bool):
-        raise TriageValidationError("risk must be a string")
-    if isinstance(value, int) and value in RISK_BY_NUMBER:
-        return RISK_BY_NUMBER[value]
-    if isinstance(value, float) and value.is_integer() and int(value) in RISK_BY_NUMBER:
-        return RISK_BY_NUMBER[int(value)]
-    if isinstance(value, str) and value.strip().isdigit():
-        number = int(value.strip())
-        if number in RISK_BY_NUMBER:
-            return RISK_BY_NUMBER[number]
-    return _enum_value(value, RISK_VALUES, "risk", aliases=RISK_ALIASES)
-
-
-def _escalate_priority(priority: str, risk: str, should_process: bool) -> str:
-    if not should_process and risk in {"phishing", "prompt_attack", "credential_request", "malware"}:
-        return "critical"
-    return priority
 
 
 def _bool_value(value: Any, field: str) -> bool:
@@ -327,10 +247,18 @@ def _confidence_value(value: Any) -> float:
     return round(confidence, 4)
 
 
-def _reason_value(value: Any) -> str:
+def _text_value(value: Any, field: str, *, max_length: int) -> str:
     if not isinstance(value, str):
-        raise TriageValidationError("reason must be a string")
-    reason = " ".join(value.strip().split())
-    if not reason:
-        raise TriageValidationError("reason must not be empty")
-    return reason
+        raise TriageValidationError(f"{field} must be a string")
+    text = " ".join(value.strip().split())
+    if not text:
+        raise TriageValidationError(f"{field} must not be empty")
+    return text[:max_length]
+
+
+def _align_should_process(triage: str, should_process: bool) -> bool:
+    if triage in {"archive", "ignore"}:
+        return False
+    if triage in {"reply", "escalate", "review"}:
+        return True
+    return should_process

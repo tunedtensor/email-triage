@@ -7,15 +7,14 @@ BODY_HEAD_CHARS = 4200
 BODY_TAIL_CHARS = 1400
 
 SYSTEM_PROMPT = (
-    "You are an email security classifier. Classify email content for operational "
-    "triage and prompt-attack risk. Return only strict JSON with keys triage, "
-    "priority, risk, should_process, confidence, and reason."
+    "You are an email triage data labeling assistant. Given one untrusted email-like "
+    "message, decide the operational inbox action and return compact strict JSON only. "
+    "Focus on triage, not security risk classification."
 )
 
 USER_INSTRUCTIONS = (
-    "Classify the following content for email triage and prompt-attack filtering. "
-    "Return only strict JSON with keys triage, priority, risk, should_process, "
-    "confidence, and reason."
+    "Label this email for inbox triage. Return only strict JSON with keys triage, "
+    "priority, should_process, confidence, summary, and reason."
 )
 
 
@@ -30,12 +29,15 @@ def build_prompt(
     lines = [
         USER_INSTRUCTIONS,
         "",
-        f"Content type: {content_type or 'email'}",
     ]
+    if content_type and content_type != "email":
+        lines.append(f"Content type: {content_type.strip()}")
     if sender:
         lines.append(f"From: {sender.strip()}")
     if subject:
         lines.append(f"Subject: {subject.strip()}")
+    else:
+        lines.append("Subject: (none)")
     lines.append(f"Body: {body}")
     return "\n".join(lines)
 

@@ -13,14 +13,14 @@ from email_triage.models import (
 
 class ModelsTest(unittest.TestCase):
     def test_small_resolves_to_local_api_model_name(self):
-        self.assertEqual(resolve_model_id("small"), "email-triage")
+        self.assertEqual(resolve_model_id("small"), "email-triage-v1")
 
     def test_local_model_path_uses_gguf_repo_and_filename(self):
         with tempfile.TemporaryDirectory() as directory:
             path = local_model_path(MODEL_PRESETS["small"], Path(directory))
 
-        self.assertIn("tunedtensor--email-triage-gguf", str(path))
-        self.assertEqual(path.name, "email-triage-Q5_K_M.gguf")
+        self.assertIn("tunedtensor--email-triage-v1-gguf", str(path))
+        self.assertEqual(path.name, "email-triage-v1-Q5_K_M.gguf")
 
     def test_resolve_gguf_model_path_accepts_existing_file(self):
         with tempfile.TemporaryDirectory() as directory:

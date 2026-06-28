@@ -6,6 +6,13 @@ All notable changes to Email Triage are recorded here.
 
 - No unreleased changes yet.
 
+## 0.3.0 - 2026-06-28
+
+- Updated the default GGUF preset to Email Triage v1, based on Tuned Tensor model `86fd9d01-87b8-4c34-ad70-c4264cd35eee`.
+- Switched the public decision schema to `triage`, `priority`, `should_process`, `confidence`, `summary`, and `reason`.
+- Removed `risk` from CLI/API outputs; security and prompt-injection handling remains a pre-triage gate and guardrail layer.
+- Updated prompts, validation, docs, and tests for the v1 triage model.
+
 ## 0.2.0 - 2026-06-26
 
 - Added a first-stage prompt-injection gate using `weijianzhg/prompt-injection-classifier`.

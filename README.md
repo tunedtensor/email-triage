@@ -3,13 +3,13 @@
 A local CLI and Python API for classifying email-like content into strict JSON
 triage decisions. It runs in two stages: first a fast classical prompt-injection
 classifier, then the GGUF triage model only when the classifier does not flag
-prompt-injection risk.
+the message.
 
 It uses one supported model path by default:
 
 - Prompt-injection gate: `weijianzhg/prompt-injection-classifier`
-- Hugging Face repo: `tunedtensor/email-triage-gguf`
-- GGUF file: `email-triage-Q5_K_M.gguf`
+- Hugging Face repo: `tunedtensor/email-triage-v1-gguf`
+- GGUF file: `email-triage-v1-Q5_K_M.gguf`
 - Preset name: `small`
 - Runtime: `llama.cpp` via its OpenAI-compatible server
 
@@ -23,17 +23,17 @@ flowchart TD
     C --> D{"Risk above threshold<br/>or deterministic pattern match?"}
 
     D -- "Yes" --> E["Short-circuit decision"]
-    E --> F["JSON output<br/>triage: ignore<br/>priority: critical<br/>risk: prompt_attack<br/>should_process: false"]
+    E --> F["JSON output<br/>triage: ignore<br/>priority: critical<br/>should_process: false"]
 
     D -- "No" --> G["Layer 2: Email triage model"]
     G --> H["OpenAI-compatible backend"]
     H --> I["llama.cpp server"]
-    I --> J["GGUF model<br/>tunedtensor/email-triage-gguf<br/>email-triage-Q5_K_M.gguf"]
+    I --> J["GGUF model<br/>tunedtensor/email-triage-v1-gguf<br/>email-triage-v1-Q5_K_M.gguf"]
 
     J --> K["Raw model JSON"]
     K --> L["Schema validation + repair"]
     L --> M["Post-triage guardrails<br/>credential theft, malware, spam,<br/>fallback prompt-injection safety"]
-    M --> N["Final JSON output<br/>triage, priority, risk,<br/>should_process, confidence, reason"]
+    M --> N["Final JSON output<br/>triage, priority,<br/>should_process, confidence,<br/>summary, reason"]
 
     subgraph CLI["CLI / Python API"]
         A
@@ -164,9 +164,9 @@ Every result is validated against `schema/email-triage.schema.json`.
 {
   "triage": "ignore",
   "priority": "critical",
-  "risk": "prompt_attack",
   "should_process": false,
   "confidence": 0.97,
+  "summary": "Email attempts to override instructions or misuse assistant tools.",
   "reason": "Email contains an instruction override or tool-abuse request targeting the assistant."
 }
 ```
@@ -175,7 +175,6 @@ Allowed values:
 
 - `triage`: `reply`, `archive`, `escalate`, `ignore`, `review`
 - `priority`: `low`, `normal`, `high`, `critical`
-- `risk`: `none`, `spam`, `phishing`, `prompt_attack`, `credential_request`, `malware`, `suspicious`
 
 Prompt-injection is handled before LLM triage by the classical classifier.
 The harness still applies deterministic guardrails after model output for
@@ -193,7 +192,7 @@ credential-theft, malware, spam, and fallback prompt-injection safety.
 ```bash
 PYTHONPATH=src python3 scripts/e2e_benchmark.py \
   --api-base http://127.0.0.1:8011/v1 \
-  --model email-triage \
+  --model email-triage-v1 \
   --warmup 2 \
   --repeat 3 \
   --json-output /tmp/email-triage-e2e-report.json
