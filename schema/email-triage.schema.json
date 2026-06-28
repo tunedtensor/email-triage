@@ -7,9 +7,9 @@
   "required": [
     "triage",
     "priority",
-    "risk",
     "should_process",
     "confidence",
+    "summary",
     "reason"
   ],
   "properties": {
@@ -21,18 +21,6 @@
       "type": "string",
       "enum": ["low", "normal", "high", "critical"]
     },
-    "risk": {
-      "type": "string",
-      "enum": [
-        "none",
-        "spam",
-        "phishing",
-        "prompt_attack",
-        "credential_request",
-        "malware",
-        "suspicious"
-      ]
-    },
     "should_process": {
       "type": "boolean"
     },
@@ -41,6 +29,11 @@
       "minimum": 0,
       "maximum": 1
     },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 320
+    },
     "reason": {
       "type": "string",
       "minLength": 1,
@@ -48,4 +41,3 @@
     }
   }
 }
-

@@ -27,11 +27,11 @@ class ModelPreset:
 MODEL_PRESETS: dict[str, ModelPreset] = {
     "small": ModelPreset(
         name="small",
-        repo_id="tunedtensor/email-triage-gguf",
-        filename="email-triage-Q5_K_M.gguf",
-        api_model_id="email-triage",
+        repo_id="tunedtensor/email-triage-v1-gguf",
+        filename="email-triage-v1-Q5_K_M.gguf",
+        api_model_id="email-triage-v1",
         quantization="Q5_K_M",
-        description="Qwen 3.5 2B email safety triage GGUF for llama.cpp.",
+        description="Qwen 3.5 2B email triage v1 GGUF for llama.cpp.",
     ),
 }
 

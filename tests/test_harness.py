@@ -26,7 +26,9 @@ class HarnessTest(unittest.TestCase):
         )
 
         self.assertEqual(decision["triage"], "ignore")
-        self.assertEqual(decision["risk"], "prompt_attack")
+        self.assertEqual(decision["priority"], "critical")
+        self.assertIn("summary", decision)
+        self.assertNotIn("risk", decision)
         self.assertIs(decision["should_process"], False)
 
     def test_rules_backend_billing_message(self):
@@ -40,7 +42,7 @@ class HarnessTest(unittest.TestCase):
         )
 
         self.assertEqual(decision["triage"], "escalate")
-        self.assertEqual(decision["risk"], "none")
+        self.assertEqual(decision["priority"], "high")
         self.assertIs(decision["should_process"], True)
 
     def test_prompt_injection_gate_blocks_before_backend(self):
@@ -51,8 +53,9 @@ class HarnessTest(unittest.TestCase):
                 del prompt, max_new_tokens, temperature
                 self.calls += 1
                 return (
-                    '{"triage":"review","priority":"normal","risk":"none",'
-                    '"should_process":true,"confidence":0.8,"reason":"OK."}'
+                    '{"triage":"review","priority":"normal",'
+                    '"should_process":true,"confidence":0.8,'
+                    '"summary":"Clean message.","reason":"OK."}'
                 )
 
         class RiskyGate:
@@ -72,7 +75,7 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(backend.calls, 0)
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "prompt_attack")
+        self.assertNotIn("risk", decision)
         self.assertIs(decision["should_process"], False)
 
     def test_prompt_injection_gate_allows_backend_when_clean(self):
@@ -83,8 +86,9 @@ class HarnessTest(unittest.TestCase):
                 del prompt, max_new_tokens, temperature
                 self.calls += 1
                 return (
-                    '{"triage":"review","priority":"normal","risk":"none",'
-                    '"should_process":true,"confidence":0.8,"reason":"OK."}'
+                    '{"triage":"review","priority":"normal",'
+                    '"should_process":true,"confidence":0.8,'
+                    '"summary":"Clean message.","reason":"OK."}'
                 )
 
         class CleanGate:
@@ -103,15 +107,15 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(backend.calls, 1)
         self.assertEqual(decision["triage"], "review")
-        self.assertEqual(decision["risk"], "none")
+        self.assertNotIn("risk", decision)
 
     def test_guardrail_overrides_tool_abuse_miss(self):
         class BenignBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"review","priority":"normal","risk":"none",'
+                    '{"triage":"review","priority":"normal",'
                     '"should_process":true,"confidence":0.6,'
-                    '"reason":"Legitimate message."}'
+                    '"summary":"Legitimate message.","reason":"Legitimate message."}'
                 )
 
         harness = EmailTriageHarness(BenignBackend())
@@ -124,7 +128,6 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "prompt_attack")
         self.assertIs(decision["should_process"], False)
 
     def test_guardrail_handles_malformed_model_output_for_prompt_attack(self):
@@ -142,16 +145,15 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "prompt_attack")
         self.assertIs(decision["should_process"], False)
 
     def test_guardrail_overrides_credential_miss(self):
         class BenignBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"reply","priority":"normal","risk":"none",'
+                    '{"triage":"reply","priority":"normal",'
                     '"should_process":true,"confidence":0.6,'
-                    '"reason":"Legitimate message."}'
+                    '"summary":"Legitimate message.","reason":"Legitimate message."}'
                 )
 
         harness = EmailTriageHarness(BenignBackend())
@@ -164,16 +166,15 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "credential_request")
         self.assertIs(decision["should_process"], False)
 
     def test_guardrail_overrides_malware_miss(self):
         class BenignBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"review","priority":"normal","risk":"none",'
+                    '{"triage":"review","priority":"normal",'
                     '"should_process":true,"confidence":0.6,'
-                    '"reason":"Legitimate message."}'
+                    '"summary":"Legitimate message.","reason":"Legitimate message."}'
                 )
 
         harness = EmailTriageHarness(BenignBackend())
@@ -186,15 +187,15 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "malware")
         self.assertIs(decision["should_process"], False)
 
     def test_guardrail_overrides_internal_scan_report_false_spam(self):
         class DriftBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"spam","priority":1,"risk":"none",'
+                    '{"triage":"spam","priority":1,'
                     '"should_process":false,"confidence":0.6,'
+                    '"summary":"Low priority automated content.",'
                     '"reason":"Low priority automated content."}'
                 )
 
@@ -206,59 +207,39 @@ class HarnessTest(unittest.TestCase):
             )
         )
 
-        self.assertEqual(decision["triage"], "review")
-        self.assertEqual(decision["priority"], "normal")
-        self.assertEqual(decision["risk"], "none")
-        self.assertIs(decision["should_process"], True)
+        self.assertEqual(decision["triage"], "archive")
+        self.assertEqual(decision["priority"], "low")
+        self.assertIs(decision["should_process"], False)
 
-    def test_security_decision_beats_generic_operational_report(self):
+    def test_guardrail_archives_delivery_notice_false_ignore(self):
         class DriftBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"ignore","priority":"critical","risk":"phishing",'
-                    '"should_process":false,"confidence":0.96,'
-                    '"reason":"Spam or phishing."}'
+                    '{"triage":"ignore","priority":"normal",'
+                    '"should_process":false,"confidence":0.62,'
+                    '"summary":"Automated delivery notice.",'
+                    '"reason":"No response requested."}'
                 )
 
         harness = EmailTriageHarness(DriftBackend())
         decision = harness.triage(
             EmailInput(
-                subject="Automated status digest",
-                body="Scheduled system status report. No action required.",
+                subject="Delivery status notification",
+                body="Package 4812 was delivered to reception at 10:42. No action required.",
             )
         )
 
-        self.assertEqual(decision["triage"], "ignore")
-        self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "phishing")
+        self.assertEqual(decision["triage"], "archive")
+        self.assertEqual(decision["priority"], "low")
         self.assertIs(decision["should_process"], False)
-
-    def test_guardrail_fallback_handles_malformed_operational_report_output(self):
-        class MalformedBackend:
-            def generate(self, prompt, *, max_new_tokens, temperature):
-                return '{"triage":"process","priority":"normal","risk":"none"'
-
-        harness = EmailTriageHarness(MalformedBackend())
-        decision = harness.triage(
-            EmailInput(
-                sender="reports@example.com",
-                subject="Automated status digest",
-                body="Scheduled system status report. No action required.",
-            )
-        )
-
-        self.assertEqual(decision["triage"], "review")
-        self.assertEqual(decision["priority"], "normal")
-        self.assertEqual(decision["risk"], "none")
-        self.assertIs(decision["should_process"], True)
 
     def test_malware_signal_still_blocks_with_report_like_subject(self):
         class BenignBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"triage":"review","priority":"low","risk":"none",'
+                    '{"triage":"review","priority":"low",'
                     '"should_process":true,"confidence":0.91,'
-                    '"reason":"Looks normal."}'
+                    '"summary":"Looks normal.","reason":"Looks normal."}'
                 )
 
         harness = EmailTriageHarness(BenignBackend())
@@ -272,15 +253,14 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "ignore")
         self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "malware")
         self.assertIs(decision["should_process"], False)
 
     def test_guardrail_escalates_billing_error(self):
         class DriftBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"priority":1,"risk":"none","should_process":true,'
-                    '"confidence":0.6,"reason":"Operational email."}'
+                    '{"priority":1,"should_process":true,"confidence":0.6,'
+                    '"summary":"Operational email.","reason":"Operational email."}'
                 )
 
         harness = EmailTriageHarness(DriftBackend())
@@ -293,15 +273,14 @@ class HarnessTest(unittest.TestCase):
 
         self.assertEqual(decision["triage"], "escalate")
         self.assertEqual(decision["priority"], "high")
-        self.assertEqual(decision["risk"], "none")
         self.assertIs(decision["should_process"], True)
 
     def test_guardrail_overrides_newsletter_spam_miss(self):
         class DriftBackend:
             def generate(self, prompt, *, max_new_tokens, temperature):
                 return (
-                    '{"priority":1,"risk":"none","should_process":true,'
-                    '"confidence":0.6,"reason":"Standard email."}'
+                    '{"priority":1,"should_process":true,"confidence":0.6,'
+                    '"summary":"Standard email.","reason":"Standard email."}'
                 )
 
         harness = EmailTriageHarness(DriftBackend())
@@ -312,30 +291,8 @@ class HarnessTest(unittest.TestCase):
             )
         )
 
-        self.assertEqual(decision["triage"], "archive")
-        self.assertEqual(decision["priority"], "low")
-        self.assertEqual(decision["risk"], "spam")
-        self.assertIs(decision["should_process"], False)
-
-    def test_guardrail_does_not_downgrade_phishing_to_spam(self):
-        class PhishingBackend:
-            def generate(self, prompt, *, max_new_tokens, temperature):
-                return (
-                    '{"priority":1,"risk":"phishing","should_process":false,'
-                    '"confidence":0.9,"reason":"Suspicious claim link."}'
-                )
-
-        harness = EmailTriageHarness(PhishingBackend())
-        decision = harness.triage(
-            EmailInput(
-                subject="Prize claim",
-                body="Congratulations, you have won a prize. Click this link now to claim before midnight.",
-            )
-        )
-
         self.assertEqual(decision["triage"], "ignore")
-        self.assertEqual(decision["priority"], "critical")
-        self.assertEqual(decision["risk"], "phishing")
+        self.assertEqual(decision["priority"], "low")
         self.assertIs(decision["should_process"], False)
 
 

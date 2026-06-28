@@ -13,7 +13,8 @@ class ApiTest(unittest.TestCase):
         )
 
         self.assertEqual(decision["triage"], "ignore")
-        self.assertEqual(decision["risk"], "prompt_attack")
+        self.assertNotIn("risk", decision)
+        self.assertIn("summary", decision)
         self.assertIs(decision["should_process"], False)
 
 

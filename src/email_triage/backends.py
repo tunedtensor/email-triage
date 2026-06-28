@@ -10,6 +10,7 @@ from typing import Any
 
 from .models import resolve_model_id
 from .prompt import SYSTEM_PROMPT
+from .schema import DECISION_JSON_SCHEMA
 
 
 class BackendError(RuntimeError):
@@ -46,6 +47,14 @@ class OpenAICompatibleBackend(TriageBackend):
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_new_tokens,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "email_triage_decision",
+                    "schema": DECISION_JSON_SCHEMA,
+                    "strict": True,
+                },
+            },
         }
         request = urllib.request.Request(
             f"{self.api_base}/chat/completions",
@@ -80,53 +89,53 @@ class RulesBackend(TriageBackend):
             return _decision(
                 triage="ignore",
                 priority="critical",
-                risk="prompt_attack",
                 should_process=False,
                 confidence=0.97,
+                summary="Email attempts to override instructions or misuse assistant tools.",
                 reason="Email contains an instruction override or tool-abuse request targeting the assistant.",
             )
         if _matches(text, ["password", "credentials", "verify your account", "login now", "reset your account"]):
             return _decision(
                 triage="ignore",
                 priority="critical",
-                risk="credential_request",
                 should_process=False,
                 confidence=0.9,
+                summary="Email asks for credentials or account verification.",
                 reason="Message asks for credentials or account verification.",
             )
         if _matches(text, ["won a prize", "claim now", "click", "limited time offer"]):
             return _decision(
-                triage="archive",
+                triage="ignore",
                 priority="low",
-                risk="spam",
                 should_process=False,
                 confidence=0.86,
+                summary="Email contains unsolicited promotional language and spam indicators.",
                 reason="Unsolicited promotional content with spam indicators.",
             )
         if _matches(text, ["invoice", "billing", "charged twice", "payment"]):
             return _decision(
                 triage="escalate",
                 priority="high",
-                risk="none",
                 should_process=True,
                 confidence=0.78,
+                summary="Email describes a billing or payment issue that needs routing.",
                 reason="Legitimate billing or payment issue requiring review.",
             )
         if _matches(text, ["scan report", "audit log", "delivery", "meeting", "support"]):
             return _decision(
                 triage="review",
                 priority="normal",
-                risk="none",
                 should_process=True,
                 confidence=0.74,
+                summary="Operational message needs a manual look before action.",
                 reason="Operational message with no concrete malicious signal.",
             )
         return _decision(
             triage="review",
             priority="normal",
-            risk="suspicious",
             should_process=True,
             confidence=0.55,
+            summary="Email has insufficient signal for automatic routing.",
             reason="Insufficient signal for an automatic route; human review is appropriate.",
         )
 
