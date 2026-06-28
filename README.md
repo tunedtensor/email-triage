@@ -1,13 +1,12 @@
 # Email Triage
 
 A local CLI and Python API for classifying email-like content into strict JSON
-triage decisions. It runs in two stages: first a fast classical prompt-injection
-classifier, then the GGUF triage model only when the classifier does not flag
-the message.
+triage decisions. It uses a deterministic prompt-injection heuristic before the
+GGUF triage model, then validates and guards the model output.
 
 It uses one supported model path by default:
 
-- Prompt-injection gate: `weijianzhg/prompt-injection-classifier`
+- Prompt-injection gate: deterministic heuristic patterns
 - Hugging Face repo: `tunedtensor/email-triage-v1-gguf`
 - GGUF file: `email-triage-v1-Q5_K_M.gguf`
 - Preset name: `small`
@@ -19,8 +18,8 @@ It uses one supported model path by default:
 flowchart TD
     A["Email input<br/>subject, sender, body, .eml, JSON, JSONL"] --> B["Normalize / parse input"]
 
-    B --> C["Layer 1: Prompt-injection gate<br/>weijianzhg/prompt-injection-classifier"]
-    C --> D{"Risk above threshold<br/>or deterministic pattern match?"}
+    B --> C["Layer 1: Prompt-injection heuristic gate"]
+    C --> D{"Deterministic prompt-injection<br/>pattern match?"}
 
     D -- "Yes" --> E["Short-circuit decision"]
     E --> F["JSON output<br/>triage: ignore<br/>priority: critical<br/>should_process: false"]
@@ -40,7 +39,7 @@ flowchart TD
         B
     end
 
-    subgraph Gate["Fast first stage"]
+    subgraph Gate["Deterministic first stage"]
         C
         D
         E
@@ -80,6 +79,9 @@ Serve it with `llama.cpp`:
 email-triage serve --port 8011 --ctx-size 4096 --gpu-layers 99
 ```
 
+`email-triage serve` passes `--cache-ram 0` to `llama-server` so independent
+email triage requests do not use llama.cpp's prompt cache.
+
 Then classify an email through that local server:
 
 ```bash
@@ -92,10 +94,8 @@ email-triage triage \
 
 The first `serve` run also downloads the GGUF if it is missing. Use
 `EMAIL_TRIAGE_CACHE_DIR=/path/to/cache` or `--cache-dir /path/to/cache` to choose
-where the model is stored. The prompt-injection classifier is downloaded lazily
-the first time `triage` or `batch` needs it. The classifier blocks only when it
-predicts malicious content above `--prompt-injection-threshold` (default `0.8`);
-deterministic prompt-injection patterns remain as a backstop.
+where the model is stored. Prompt-injection handling is heuristic-only: obvious
+instruction override and tool-abuse patterns are blocked before LLM triage.
 
 ## Smoke Test
 
@@ -119,11 +119,8 @@ email-triage --version
 # Single email
 email-triage triage --subject "Prize" --body "Click now to claim your reward."
 
-# Disable the first-stage classifier for debugging only
+# Disable the first-stage heuristic gate for debugging only
 email-triage triage --prompt-injection-gate off --subject "Hello" --body "Need support"
-
-# Raise or lower the first-stage block threshold
-email-triage triage --prompt-injection-threshold 0.9 --subject "Hello" --body "Need support"
 
 # Read .eml, JSON, or plain text
 email-triage triage --file message.eml
@@ -151,7 +148,7 @@ decision = email_triage.triage(
     subject="Billing error on latest invoice",
     backend="openai",
     api_base="http://127.0.0.1:8011/v1",
-    prompt_injection_gate="classifier",
+    prompt_injection_gate="heuristic",
 )
 print(decision)
 ```
@@ -176,9 +173,9 @@ Allowed values:
 - `triage`: `reply`, `archive`, `escalate`, `ignore`, `review`
 - `priority`: `low`, `normal`, `high`, `critical`
 
-Prompt-injection is handled before LLM triage by the classical classifier.
-The harness still applies deterministic guardrails after model output for
-credential-theft, malware, spam, and fallback prompt-injection safety.
+Prompt-injection is handled before LLM triage by deterministic heuristic
+patterns. The harness still applies guardrails after model output for
+credential-theft, malware, spam, and prompt-injection safety.
 
 ## Backends
 

@@ -1,12 +1,12 @@
 # Email Triage Agent Skill
 
 Use this skill when an agent needs to download, serve, test, or call the Email
-Triage CLI with the prompt-injection gate and hosted GGUF triage model.
+Triage CLI with the heuristic prompt-injection gate and hosted GGUF triage model.
 
 ## Model
 
 - Default preset: `small`
-- Prompt-injection classifier: `weijianzhg/prompt-injection-classifier`
+- Prompt-injection gate: deterministic heuristic patterns
 - Hugging Face repo: `tunedtensor/email-triage-v1-gguf`
 - GGUF file: `email-triage-v1-Q5_K_M.gguf`
 - OpenAI-compatible model id: `email-triage-v1`
@@ -28,14 +28,14 @@ email-triage serve --port 8011 --ctx-size 4096 --gpu-layers 99
 ```
 
 `email-triage serve` uses `llama.cpp` and disables reasoning output by default
-so responses stay inside the strict JSON triage schema.
+so responses stay inside the strict JSON triage schema. It also passes
+`--cache-ram 0` to disable llama.cpp's prompt cache for independent email
+triage requests.
 
-Prompt-injection detection is a separate first stage. The default
-`--prompt-injection-gate classifier` downloads and uses the classical
-`weijianzhg/prompt-injection-classifier` joblib model before LLM triage. It
-blocks when the classifier predicts malicious content above
-`--prompt-injection-threshold` (default `0.8`); deterministic prompt-injection
-patterns are still used as a backstop.
+Prompt-injection detection is a deterministic first stage. The default
+`--prompt-injection-gate heuristic` blocks obvious instruction override and
+tool-abuse patterns before LLM triage. Use `--prompt-injection-gate off` only
+for debugging.
 
 ## Classify
 

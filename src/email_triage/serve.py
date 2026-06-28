@@ -57,6 +57,8 @@ def run_llama_server(
         str(parallel),
         "--temp",
         str(temperature),
+        "--cache-ram",
+        "0",
     ]
     if gpu_layers is not None:
         command.extend(["-ngl", str(gpu_layers)])

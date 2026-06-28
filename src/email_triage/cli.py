@@ -17,8 +17,6 @@ from .models import (
     local_model_path,
     resolve_gguf_model_path,
 )
-from .prompt_injection import DEFAULT_PROMPT_INJECTION_REPO
-from .prompt_injection import DEFAULT_PROMPT_INJECTION_THRESHOLD
 from .prompt_injection import PromptInjectionGateError
 from .prompt_injection import create_prompt_injection_gate
 from .prompt import build_prompt
@@ -126,20 +124,9 @@ def add_backend_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument(
         "--prompt-injection-gate",
-        choices=["classifier", "heuristic", "off"],
-        default="classifier",
-        help="first-stage prompt-injection gate before LLM triage",
-    )
-    parser.add_argument(
-        "--prompt-injection-model",
-        default=DEFAULT_PROMPT_INJECTION_REPO,
-        help="Hugging Face repo for the first-stage prompt-injection classifier",
-    )
-    parser.add_argument(
-        "--prompt-injection-threshold",
-        type=float,
-        default=DEFAULT_PROMPT_INJECTION_THRESHOLD,
-        help="minimum classifier malicious probability required to block before LLM triage",
+        choices=["heuristic", "off"],
+        default="heuristic",
+        help="deterministic prompt-injection gate before LLM triage",
     )
     parser.add_argument(
         "--no-system-prompt",
@@ -155,11 +142,7 @@ def run_triage(args: argparse.Namespace) -> None:
         backend,
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
-        prompt_injection_gate=create_prompt_injection_gate(
-            args.prompt_injection_gate,
-            model_repo=args.prompt_injection_model,
-            threshold=args.prompt_injection_threshold,
-        ),
+        prompt_injection_gate=create_prompt_injection_gate(args.prompt_injection_gate),
     )
     if args.raw:
         decision, raw = harness.triage_with_raw(email_input)
@@ -175,11 +158,7 @@ def run_batch(args: argparse.Namespace) -> None:
         backend,
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
-        prompt_injection_gate=create_prompt_injection_gate(
-            args.prompt_injection_gate,
-            model_repo=args.prompt_injection_model,
-            threshold=args.prompt_injection_threshold,
-        ),
+        prompt_injection_gate=create_prompt_injection_gate(args.prompt_injection_gate),
     )
     output_handle = args.output.open("w", encoding="utf-8") if args.output else sys.stdout
     close_output = args.output is not None
