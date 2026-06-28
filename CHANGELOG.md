@@ -6,6 +6,13 @@ All notable changes to Email Triage are recorded here.
 
 - No unreleased changes yet.
 
+## 0.3.1 - 2026-06-28
+
+- Removed the classical prompt-injection classifier from the runtime path.
+- Made the deterministic heuristic prompt-injection gate the default and only enabled gate mode.
+- Removed classifier model and threshold CLI/API options, along with `joblib`, `scikit-learn`, and `scipy` dependencies.
+- `email-triage serve` now passes `--cache-ram 0` to `llama-server` to disable prompt caching.
+
 ## 0.3.0 - 2026-06-28
 
 - Updated the default GGUF preset to Email Triage v1, based on Tuned Tensor model `86fd9d01-87b8-4c34-ad70-c4264cd35eee`.

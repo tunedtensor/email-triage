@@ -13,9 +13,6 @@ authors = [{ name = "Email Triage contributors" }]
 keywords = ["email", "triage", "security", "classification", "llama.cpp", "huggingface"]
 dependencies = [
   "huggingface-hub>=0.30",
-  "joblib>=1.4",
-  "scikit-learn>=1.4",
-  "scipy>=1.10",
 ]
 
 [project.scripts]

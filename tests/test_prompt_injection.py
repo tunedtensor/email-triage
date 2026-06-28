@@ -22,6 +22,10 @@ class PromptInjectionGateTest(unittest.TestCase):
     def test_off_gate_returns_none(self):
         self.assertIsNone(create_prompt_injection_gate("off"))
 
+    def test_classifier_gate_is_removed(self):
+        with self.assertRaisesRegex(Exception, "heuristic, off"):
+            create_prompt_injection_gate("classifier")
+
 
 if __name__ == "__main__":
     unittest.main()

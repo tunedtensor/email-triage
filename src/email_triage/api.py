@@ -5,8 +5,6 @@ from typing import Any
 
 from .backends import create_backend
 from .harness import EmailInput, EmailTriageHarness
-from .prompt_injection import DEFAULT_PROMPT_INJECTION_REPO
-from .prompt_injection import DEFAULT_PROMPT_INJECTION_THRESHOLD
 from .prompt_injection import create_prompt_injection_gate
 
 
@@ -21,9 +19,7 @@ def triage(
     api_base: str | None = None,
     api_key_env: str | None = None,
     include_system_prompt: bool = True,
-    prompt_injection_gate: str = "classifier",
-    prompt_injection_model: str = DEFAULT_PROMPT_INJECTION_REPO,
-    prompt_injection_threshold: float = DEFAULT_PROMPT_INJECTION_THRESHOLD,
+    prompt_injection_gate: str = "heuristic",
     max_new_tokens: int = 192,
     temperature: float = 0.0,
 ) -> dict[str, Any]:
@@ -39,11 +35,7 @@ def triage(
         triage_backend,
         max_new_tokens=max_new_tokens,
         temperature=temperature,
-        prompt_injection_gate=create_prompt_injection_gate(
-            prompt_injection_gate,
-            model_repo=prompt_injection_model,
-            threshold=prompt_injection_threshold,
-        ),
+        prompt_injection_gate=create_prompt_injection_gate(prompt_injection_gate),
     )
     return harness.triage(
         EmailInput(
@@ -63,9 +55,7 @@ def triage_batch(
     api_base: str | None = None,
     api_key_env: str | None = None,
     include_system_prompt: bool = True,
-    prompt_injection_gate: str = "classifier",
-    prompt_injection_model: str = DEFAULT_PROMPT_INJECTION_REPO,
-    prompt_injection_threshold: float = DEFAULT_PROMPT_INJECTION_THRESHOLD,
+    prompt_injection_gate: str = "heuristic",
     max_new_tokens: int = 192,
     temperature: float = 0.0,
 ) -> list[dict[str, Any]]:
@@ -81,10 +71,6 @@ def triage_batch(
         triage_backend,
         max_new_tokens=max_new_tokens,
         temperature=temperature,
-        prompt_injection_gate=create_prompt_injection_gate(
-            prompt_injection_gate,
-            model_repo=prompt_injection_model,
-            threshold=prompt_injection_threshold,
-        ),
+        prompt_injection_gate=create_prompt_injection_gate(prompt_injection_gate),
     )
     return [harness.triage(email) for email in emails]
