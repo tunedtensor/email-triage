@@ -14,7 +14,6 @@ def triage(
     subject: str | None = None,
     sender: str | None = None,
     content_type: str = "email",
-    backend: str = "auto",
     model: str | None = "small",
     api_base: str | None = None,
     api_key_env: str | None = None,
@@ -25,7 +24,6 @@ def triage(
 ) -> dict[str, Any]:
     """Classify one email-like input and return a validated decision."""
     triage_backend = create_backend(
-        backend=backend,
         model=model,
         api_base=api_base,
         api_key_env=api_key_env,
@@ -50,7 +48,6 @@ def triage(
 def triage_batch(
     emails: Iterable[EmailInput],
     *,
-    backend: str = "auto",
     model: str | None = "small",
     api_base: str | None = None,
     api_key_env: str | None = None,
@@ -59,9 +56,8 @@ def triage_batch(
     max_new_tokens: int = 192,
     temperature: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Classify a sequence of email-like inputs with one backend instance."""
+    """Classify a sequence of email-like inputs with one HTTP runtime client."""
     triage_backend = create_backend(
-        backend=backend,
         model=model,
         api_base=api_base,
         api_key_env=api_key_env,

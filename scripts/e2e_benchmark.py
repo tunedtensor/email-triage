@@ -150,7 +150,6 @@ def main() -> int:
     args = parser.parse_args()
 
     backend = create_backend(
-        backend="openai",
         model=args.model,
         api_base=args.api_base,
         api_key_env=None,
