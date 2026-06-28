@@ -12,4 +12,4 @@ build/
 models/
 *.jsonl.out
 *.tar.gz
-
+uv.lock
