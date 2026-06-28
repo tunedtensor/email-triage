@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
-from typing import Any
 
 from .models import resolve_model_id
 from .prompt import SYSTEM_PROMPT
@@ -79,101 +77,23 @@ class OpenAICompatibleBackend(TriageBackend):
         return headers
 
 
-class RulesBackend(TriageBackend):
-    """Deterministic fallback for smoke tests and integration development."""
-
-    def generate(self, prompt: str, *, max_new_tokens: int, temperature: float) -> str:
-        del max_new_tokens, temperature
-        text = prompt.lower()
-        if _matches(text, ["ignore previous", "ignore all previous", "system prompt", "exfiltrate", "forward mailbox", "call the payment tool"]):
-            return _decision(
-                triage="ignore",
-                priority="critical",
-                should_process=False,
-                confidence=0.97,
-                summary="Email attempts to override instructions or misuse assistant tools.",
-                reason="Email contains an instruction override or tool-abuse request targeting the assistant.",
-            )
-        if _matches(text, ["password", "credentials", "verify your account", "login now", "reset your account"]):
-            return _decision(
-                triage="ignore",
-                priority="critical",
-                should_process=False,
-                confidence=0.9,
-                summary="Email asks for credentials or account verification.",
-                reason="Message asks for credentials or account verification.",
-            )
-        if _matches(text, ["won a prize", "claim now", "click", "limited time offer"]):
-            return _decision(
-                triage="ignore",
-                priority="low",
-                should_process=False,
-                confidence=0.86,
-                summary="Email contains unsolicited promotional language and spam indicators.",
-                reason="Unsolicited promotional content with spam indicators.",
-            )
-        if _matches(text, ["invoice", "billing", "charged twice", "payment"]):
-            return _decision(
-                triage="escalate",
-                priority="high",
-                should_process=True,
-                confidence=0.78,
-                summary="Email describes a billing or payment issue that needs routing.",
-                reason="Legitimate billing or payment issue requiring review.",
-            )
-        if _matches(text, ["scan report", "audit log", "delivery", "meeting", "support"]):
-            return _decision(
-                triage="review",
-                priority="normal",
-                should_process=True,
-                confidence=0.74,
-                summary="Operational message needs a manual look before action.",
-                reason="Operational message with no concrete malicious signal.",
-            )
-        return _decision(
-            triage="review",
-            priority="normal",
-            should_process=True,
-            confidence=0.55,
-            summary="Email has insufficient signal for automatic routing.",
-            reason="Insufficient signal for an automatic route; human review is appropriate.",
-        )
-
-
 def create_backend(
     *,
-    backend: str,
     model: str | None,
     api_base: str | None,
     api_key_env: str | None,
     include_system_prompt: bool = True,
 ) -> TriageBackend:
     model_id = resolve_model_id(model)
-    if backend == "rules":
-        return RulesBackend()
-    if backend == "auto" and api_base:
-        backend = "openai"
-    if backend == "auto":
+    if not api_base:
         raise BackendError(
             "local GGUF inference runs through llama.cpp. Start `email-triage serve` "
             "in another terminal, then pass --api-base http://127.0.0.1:8011/v1."
         )
-    if backend == "openai":
-        if not api_base:
-            raise BackendError("--api-base is required for --backend openai")
-        api_key = os.environ.get(api_key_env) if api_key_env else None
-        return OpenAICompatibleBackend(
-            api_base=api_base,
-            model=model_id,
-            api_key=api_key,
-            include_system_prompt=include_system_prompt,
-        )
-    raise BackendError(f"unknown backend: {backend}")
-
-
-def _matches(text: str, needles: list[str]) -> bool:
-    return any(re.search(rf"\b{re.escape(needle)}\b", text) for needle in needles)
-
-
-def _decision(**values: Any) -> str:
-    return json.dumps(values, separators=(",", ":"), sort_keys=True)
+    api_key = os.environ.get(api_key_env) if api_key_env else None
+    return OpenAICompatibleBackend(
+        api_base=api_base,
+        model=model_id,
+        api_key=api_key,
+        include_system_prompt=include_system_prompt,
+    )

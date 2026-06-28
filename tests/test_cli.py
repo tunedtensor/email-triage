@@ -22,7 +22,7 @@ class CliTest(unittest.TestCase):
             parser.parse_args(["--version"])
 
         self.assertEqual(raised.exception.code, 0)
-        self.assertIn("email-triage 0.3.1", output.getvalue())
+        self.assertIn("email-triage 0.3.2", output.getvalue())
 
     def test_parser_has_serve_command(self):
         parser = build_parser()
@@ -44,8 +44,6 @@ class CliTest(unittest.TestCase):
         args = parser.parse_args(
             [
                 "triage",
-                "--backend",
-                "rules",
                 "--prompt-injection-gate",
                 "heuristic",
                 "--subject",
@@ -64,10 +62,24 @@ class CliTest(unittest.TestCase):
             parser.parse_args(
                 [
                     "triage",
-                    "--backend",
-                    "rules",
                     "--prompt-injection-gate",
                     "classifier",
+                    "--subject",
+                    "Hello",
+                    "--body",
+                    "Need support",
+                ]
+            )
+
+    def test_parser_rejects_backend_option(self):
+        parser = build_parser()
+
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parser.parse_args(
+                [
+                    "triage",
+                    "--backend",
+                    "openai",
                     "--subject",
                     "Hello",
                     "--body",

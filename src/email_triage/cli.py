@@ -111,12 +111,6 @@ def add_input_args(parser: argparse.ArgumentParser) -> None:
 
 
 def add_backend_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--backend",
-        choices=["auto", "openai", "rules"],
-        default="auto",
-        help="inference backend",
-    )
     parser.add_argument("--model", default="small", help="model preset or model id")
     parser.add_argument("--api-base", help="OpenAI-compatible API base URL, e.g. http://127.0.0.1:8000/v1")
     parser.add_argument("--api-key-env", help="environment variable containing API key")
@@ -242,7 +236,6 @@ def run_serve(args: argparse.Namespace) -> None:
 
 def create_backend_from_args(args: argparse.Namespace):
     return create_backend(
-        backend=args.backend,
         model=args.model,
         api_base=args.api_base,
         api_key_env=args.api_key_env,

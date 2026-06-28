@@ -6,6 +6,13 @@ All notable changes to Email Triage are recorded here.
 
 - No unreleased changes yet.
 
+## 0.3.2 - 2026-06-28
+
+- Removed post-model guardrail rewrites. Valid model JSON is now preserved after schema validation.
+- Removed backend selection from the CLI and Python backend factory; the package now uses the OpenAI-compatible HTTP backend directly.
+- Kept the pre-model heuristic prompt-injection gate for obvious instruction override and tool-abuse patterns.
+- Updated docs to show the simplified validation-only post-model path.
+
 ## 0.3.1 - 2026-06-28
 
 - Removed the classical prompt-injection classifier from the runtime path.
