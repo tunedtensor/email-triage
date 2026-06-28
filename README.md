@@ -1,5 +1,7 @@
 # Email Triage
 
+[![PyPI](https://img.shields.io/pypi/v/email-triage.svg)](https://pypi.org/project/email-triage/)
+
 A local CLI and Python API for classifying email-like content into strict JSON
 triage decisions. It uses a deterministic prompt-injection heuristic before the
 GGUF triage model, then validates the model output without post-model rule
@@ -15,53 +17,14 @@ It uses one supported model path by default:
 
 ## Current Design
 
-```mermaid
-flowchart TD
-    A["Email input<br/>subject, sender, body, .eml, JSON, JSONL"] --> B["Normalize / parse input"]
-
-    B --> C["Layer 1: Prompt-injection heuristic gate"]
-    C --> D{"Deterministic prompt-injection<br/>pattern match?"}
-
-    D -- "Yes" --> E["Short-circuit decision"]
-    E --> F["JSON output<br/>triage: ignore<br/>priority: critical<br/>should_process: false"]
-
-    D -- "No" --> G["Layer 2: Email triage model"]
-    G --> H["OpenAI-compatible HTTP runtime"]
-    H --> I["llama.cpp server"]
-    I --> J["GGUF model<br/>tunedtensor/email-triage-v1-gguf<br/>email-triage-v1-Q5_K_M.gguf"]
-
-    J --> K["Raw model JSON"]
-    K --> L["Schema validation + repair"]
-    L --> N["Final JSON output<br/>triage, priority,<br/>should_process, confidence,<br/>summary, reason"]
-
-    subgraph CLI["CLI / Python API"]
-        A
-        B
-    end
-
-    subgraph Gate["Deterministic first stage"]
-        C
-        D
-        E
-    end
-
-    subgraph Triage["LLM triage stage"]
-        G
-        H
-        I
-        J
-    end
-
-    subgraph Validation["Validation"]
-        K
-        L
-    end
-```
+See the
+[current design diagram](https://github.com/tunedtensor/email-triage/blob/main/docs/current-design.md)
+for the runtime flow.
 
 ## Install
 
 ```bash
-pip install -e .
+pip install email-triage
 ```
 
 ## Run Locally

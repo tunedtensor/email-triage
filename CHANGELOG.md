@@ -6,6 +6,12 @@ All notable changes to Email Triage are recorded here.
 
 - No unreleased changes yet.
 
+## 0.4.0 - 2026-06-28
+
+- Added PyPI-focused README updates, including a PyPI version badge and `pip install email-triage` installation instructions.
+- Moved the Mermaid runtime diagram out of the PyPI-rendered README and into `docs/current-design.md`.
+- Ignored local `uv.lock` artifacts because the package build and CI use `pyproject.toml` rather than a committed uv lockfile.
+
 ## 0.3.2 - 2026-06-28
 
 - Removed post-model guardrail rewrites. Valid model JSON is now preserved after schema validation.

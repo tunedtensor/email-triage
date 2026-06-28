@@ -22,7 +22,7 @@ class CliTest(unittest.TestCase):
             parser.parse_args(["--version"])
 
         self.assertEqual(raised.exception.code, 0)
-        self.assertIn("email-triage 0.3.2", output.getvalue())
+        self.assertIn("email-triage 0.4.0", output.getvalue())
 
     def test_parser_has_serve_command(self):
         parser = build_parser()

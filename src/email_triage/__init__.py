@@ -1,6 +1,6 @@
 """Local email safety triage."""
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 from .api import triage, triage_batch
 from .harness import EmailInput, EmailTriageHarness
